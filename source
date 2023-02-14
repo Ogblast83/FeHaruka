@@ -1,0 +1,3553 @@
+game.Players.LocalPlayer.Character["LUAhEAD"].Handle.Mesh:Destroy() --Pink Hair
+game.Players.LocalPlayer.Character["Pink Hair"].Handle.Mesh:Destroy()
+game.Players.LocalPlayer.Character["Kate Hair"].Handle.Mesh:Destroy() --LavanderHair
+game.Players.LocalPlayer.Character["LavanderHair"].Handle.Mesh:Destroy()
+game.Players.LocalPlayer.Character["Robloxclassicred"].Handle.Mesh:Destroy()
+
+
+
+local v3_net, v3_808 = Vector3.new(20000, 20000, 20000), Vector3.new(8, 0, 8)
+		local function getNetlessVelocity(realPartVelocity)
+			local mag = realPartVelocity.Magnitude
+			if mag > 1 then
+				local unit = realPartVelocity.Unit
+				if (unit.Y > 0.25) or (unit.Y < -0.75) then
+					return unit * (25.1 / unit.Y)
+				end
+			end 
+			return v3_net + realPartVelocity * v3_808
+		end
+		local simradius = "shp" --simulation radius (net bypass) method
+--simulation radius (net bypass) method
+--"shp" - sethiddenproperty
+--"ssr" - setsimulationradius
+--false - disable
+local antiragdoll = true --removes hingeConstraints and ballSocketConstraints from your character
+local newanimate = false --disables the animate script and enables after reanimation
+local discharscripts = true --disables all localScripts parented to your character before reanimation
+local R15toR6 = true --tries to convert your character to r6 if its r15
+local hatcollide = true --makes hats cancollide (only method 0)
+local humState16 = true --enables collisions for limbs before the humanoid dies (using hum:ChangeState)
+local addtools = false --puts all tools from backpack to character and lets you hold them after reanimation
+local hedafterneck = false --disable aligns for head and enable after neck is removed
+local loadtime = game:GetService("Players").RespawnTime + 0.5 --anti respawn delay
+local method = 0 --reanimation method
+--methods:
+--0 - breakJoints (takes [loadtime] seconds to laod)
+--1 - limbs
+--2 - limbs + anti respawn
+--3 - limbs + breakJoints after [loadtime] seconds
+--4 - remove humanoid + breakJoints
+--5 - remove humanoid + limbs
+local alignmode = 3 --AlignPosition mode
+--modes:
+--1 - AlignPosition rigidity enabled true
+--2 - 2 AlignPositions rigidity enabled both true and false
+--3 - AlignPosition rigidity enabled false
+
+healthHide = healthHide and ((method == 0) or (method == 2) or (method == 000)) and gp(c, "Head", "BasePart")
+
+local lp = game:GetService("Players").LocalPlayer
+local rs = game:GetService("RunService")
+local stepped = rs.Stepped
+local heartbeat = rs.Heartbeat
+local renderstepped = rs.RenderStepped
+local sg = game:GetService("StarterGui")
+local ws = game:GetService("Workspace")
+local cf = CFrame.new
+local v3 = Vector3.new
+local v3_0 = v3(0, 0, 0)
+local inf = math.huge
+
+local c = lp.Character
+
+if not (c and c.Parent) then
+	return
+end
+
+c.Destroying:Connect(function()
+	c = nil
+end)
+
+local function gp(parent, name, className)
+	if typeof(parent) == "Instance" then
+		for i, v in pairs(parent:GetChildren()) do
+			if (v.Name == name) and v:IsA(className) then
+				return v
+			end
+		end
+	end
+	return nil
+end
+
+local function align(Part0, Part1)
+	Part0.CustomPhysicalProperties = PhysicalProperties.new(0.0001, 0.0001, 0.0001, 0.0001, 0.0001)
+
+	local att0 = Instance.new("Attachment", Part0)
+	att0.Orientation = v3_0
+	att0.Position = v3_0
+	att0.Name = "att0_" .. Part0.Name
+	local att1 = Instance.new("Attachment", Part1)
+	att1.Orientation = v3_0
+	att1.Position = v3_0
+	att1.Name = "att1_" .. Part1.Name
+
+	if (alignmode == 1) or (alignmode == 2) then
+		local ape = Instance.new("AlignPosition", att0)
+		ape.ApplyAtCenterOfMass = false
+		ape.MaxForce = inf
+		ape.MaxVelocity = inf
+		ape.ReactionForceEnabled = false
+		ape.Responsiveness = 200
+		ape.Attachment1 = att1
+		ape.Attachment0 = att0
+		ape.Name = "AlignPositionRtrue"
+		ape.RigidityEnabled = true
+	end
+
+	if (alignmode == 2) or (alignmode == 3) then
+		local apd = Instance.new("AlignPosition", att0)
+		apd.ApplyAtCenterOfMass = false
+		apd.MaxForce = inf
+		apd.MaxVelocity = inf
+		apd.ReactionForceEnabled = false
+		apd.Responsiveness = 200
+		apd.Attachment1 = att1
+		apd.Attachment0 = att0
+		apd.Name = "AlignPositionRfalse"
+		apd.RigidityEnabled = false
+	end
+
+	local ao = Instance.new("AlignOrientation", att0)
+	ao.MaxAngularVelocity = inf
+	ao.MaxTorque = inf
+	ao.PrimaryAxisOnly = false
+	ao.ReactionTorqueEnabled = false
+	ao.Responsiveness = 200
+	ao.Attachment1 = att1
+	ao.Attachment0 = att0
+	ao.RigidityEnabled = false
+
+	if type(getNetlessVelocity) == "function" then
+	    local realVelocity = v3_0
+        local steppedcon = stepped:Connect(function()
+            Part0.Velocity = realVelocity
+        end)
+        local heartbeatcon = heartbeat:Connect(function()
+            realVelocity = Part0.Velocity
+            Part0.Velocity = getNetlessVelocity(realVelocity)
+        end)
+        Part0.Destroying:Connect(function()
+            Part0 = nil
+            steppedcon:Disconnect()
+            heartbeatcon:Disconnect()
+        end)
+    end
+end
+
+local function respawnrequest()
+	local ccfr = ws.CurrentCamera.CFrame
+	local c = lp.Character
+	lp.Character = nil
+	lp.Character = c
+	local con = nil
+	con = ws.CurrentCamera.Changed:Connect(function(prop)
+	    if (prop ~= "Parent") and (prop ~= "CFrame") then
+	        return
+	    end
+	    ws.CurrentCamera.CFrame = ccfr
+	    con:Disconnect()
+    end)
+end
+
+local destroyhum = (method == 4) or (method == 5)
+local breakjoints = (method == 0) or (method == 4)
+local antirespawn = (method == 0) or (method == 2) or (method == 3)
+
+hatcollide = hatcollide and (method == 0)
+
+addtools = addtools and gp(lp, "Backpack", "Backpack")
+
+local fenv = getfenv()
+local shp = fenv.sethiddenproperty or fenv.set_hidden_property or fenv.set_hidden_prop or fenv.sethiddenprop
+local ssr = fenv.setsimulationradius or fenv.set_simulation_radius or fenv.set_sim_radius or fenv.setsimradius or fenv.set_simulation_rad or fenv.setsimulationrad
+
+if shp and (simradius == "shp") then
+	spawn(function()
+		while c and heartbeat:Wait() do
+			shp(lp, "SimulationRadius", inf)
+		end
+	end)
+elseif ssr and (simradius == "ssr") then
+	spawn(function()
+		while c and heartbeat:Wait() do
+			ssr(inf)
+		end
+	end)
+end
+
+antiragdoll = antiragdoll and function(v)
+	if v:IsA("HingeConstraint") or v:IsA("BallSocketConstraint") then
+		v.Parent = nil
+	end
+end
+
+if antiragdoll then
+	for i, v in pairs(c:GetDescendants()) do
+		antiragdoll(v)
+	end
+	c.DescendantAdded:Connect(antiragdoll)
+end
+
+if antirespawn then
+	respawnrequest()
+end
+
+if method == 0 then
+	wait(loadtime)
+	if not c then
+		return
+	end
+end
+
+if discharscripts then
+	for i, v in pairs(c:GetChildren()) do
+		if v:IsA("LocalScript") then
+			v.Disabled = true
+		end
+	end
+elseif newanimate then
+	local animate = gp(c, "Animate", "LocalScript")
+	if animate and (not animate.Disabled) then
+		animate.Disabled = true
+	else
+		newanimate = false
+	end
+end
+
+if addtools then
+	for i, v in pairs(addtools:GetChildren()) do
+		if v:IsA("Tool") then
+			v.Parent = c
+		end
+	end
+end
+
+pcall(function()
+	settings().Physics.AllowSleep = false
+	settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalPhysicsThrottle.Disabled
+end)
+
+local OLDscripts = {}
+
+for i, v in pairs(c:GetDescendants()) do
+	if v.ClassName == "Script" then
+		table.insert(OLDscripts, v)
+	end
+end
+
+local scriptNames = {}
+
+for i, v in pairs(c:GetDescendants()) do
+	if v:IsA("BasePart") then
+		local newName = tostring(i)
+		local exists = true
+		while exists do
+			exists = false
+			for i, v in pairs(OLDscripts) do
+				if v.Name == newName then
+					exists = true
+				end
+			end
+			if exists then
+				newName = newName .. "_"    
+			end
+		end
+		table.insert(scriptNames, newName)
+		Instance.new("Script", v).Name = newName
+	end
+end
+
+c.Archivable = true
+local hum = c:FindFirstChildOfClass("Humanoid")
+if hum then
+	for i, v in pairs(hum:GetPlayingAnimationTracks()) do
+		v:Stop()
+	end
+end
+local cl = c:Clone()
+if hum and humState16 then
+    hum:ChangeState(Enum.HumanoidStateType.Physics)
+    if destroyhum then
+        wait(1.6)
+    end
+end
+if hum and hum.Parent and destroyhum then
+    hum:Destroy()
+end
+
+if not c then
+    return
+end
+
+local head = gp(c, "Head", "BasePart")
+local torso = gp(c, "Torso", "BasePart") or gp(c, "UpperTorso", "BasePart")
+local root = gp(c, "HumanoidRootPart", "BasePart")
+if hatcollide and c:FindFirstChildOfClass("Accessory") then
+    local anything = c:FindFirstChildOfClass("BodyColors") or gp(c, "Health", "Script")
+    if not (torso and root and anything) then
+        return
+    end
+    torso:Destroy()
+    root:Destroy()
+    if shp then
+        for i,v in pairs(c:GetChildren()) do
+            if v:IsA("Accessory") then
+                shp(v, "BackendAccoutrementState", 0)
+            end 
+        end
+    end
+    anything:Destroy()
+    if head then
+       head:Destroy()
+    end
+end
+
+for i, v in pairs(cl:GetDescendants()) do
+	if v:IsA("BasePart") then
+		v.Transparency = 1
+		v.Anchored = false
+	end
+end
+
+local model = Instance.new("Model", c)
+model.Name = model.ClassName
+
+model.Destroying:Connect(function()
+	model = nil
+end)
+
+for i, v in pairs(c:GetChildren()) do
+	if v ~= model then
+		if addtools and v:IsA("Tool") then
+			for i1, v1 in pairs(v:GetDescendants()) do
+				if v1 and v1.Parent and v1:IsA("BasePart") then
+					local bv = Instance.new("BodyVelocity", v1)
+					bv.Velocity = v3_0
+					bv.MaxForce = v3(1000, 1000, 1000)
+					bv.P = 1250
+					bv.Name = "bv_" .. v.Name
+				end
+			end
+		end
+		v.Parent = model
+	end
+end
+
+if breakjoints then
+	model:BreakJoints()
+else
+	if head and torso then
+		for i, v in pairs(model:GetDescendants()) do
+			if v:IsA("Weld") or v:IsA("Snap") or v:IsA("Glue") or v:IsA("Motor") or v:IsA("Motor6D") then
+				local save = false
+				if (v.Part0 == torso) and (v.Part1 == head) then
+					save = true
+				end
+				if (v.Part0 == head) and (v.Part1 == torso) then
+					save = true
+				end
+				if save then
+					if hedafterneck then
+						hedafterneck = v
+					end
+				else
+					v:Destroy()
+				end
+			end
+		end
+	end
+	if method == 3 then
+		spawn(function()
+			wait(loadtime)
+			if model then
+				model:BreakJoints()
+			end
+		end)
+	end
+end
+
+cl.Parent = c
+for i, v in pairs(cl:GetChildren()) do
+	v.Parent = c
+end
+cl:Destroy()
+
+local modelDes = {}
+for i, v in pairs(model:GetDescendants()) do
+	if v:IsA("BasePart") then
+		i = tostring(i)
+		v.Destroying:Connect(function()
+			modelDes[i] = nil
+		end)
+		modelDes[i] = v
+	end
+end
+local modelcolcon = nil
+local function modelcolf()
+	if model then
+		for i, v in pairs(modelDes) do
+			v.CanCollide = false
+		end
+	else
+		modelcolcon:Disconnect()
+	end
+end
+modelcolcon = stepped:Connect(modelcolf)
+modelcolf()
+
+for i, scr in pairs(model:GetDescendants()) do
+	if (scr.ClassName == "Script") and table.find(scriptNames, scr.Name) then
+		local Part0 = scr.Parent
+		if Part0:IsA("BasePart") then
+			for i1, scr1 in pairs(c:GetDescendants()) do
+				if (scr1.ClassName == "Script") and (scr1.Name == scr.Name) and (not scr1:IsDescendantOf(model)) then
+					local Part1 = scr1.Parent
+					if (Part1.ClassName == Part0.ClassName) and (Part1.Name == Part0.Name) then
+						align(Part0, Part1)
+						break
+					end
+				end
+			end
+		end
+	end
+end
+
+if (typeof(hedafterneck) == "Instance") and head then
+	local aligns = {}
+	local con = nil
+	con = hedafterneck.Changed:Connect(function(prop)
+	    if (prop == "Parent") and not hedafterneck.Parent then
+	        con:Disconnect()
+    		for i, v in pairs(aligns) do
+    			v.Enabled = true
+    		end
+		end
+	end)
+	for i, v in pairs(head:GetDescendants()) do
+		if v:IsA("AlignPosition") or v:IsA("AlignOrientation") then
+			i = tostring(i)
+			aligns[i] = v
+			v.Destroying:Connect(function()
+			    aligns[i] = nil
+			end)
+			v.Enabled = false
+		end
+	end
+end
+
+for i, v in pairs(c:GetDescendants()) do
+	if v and v.Parent then
+		if v.ClassName == "Script" then
+			if table.find(scriptNames, v.Name) then
+				v:Destroy()
+			end
+		elseif not v:IsDescendantOf(model) then
+			if v:IsA("Decal") then
+				v.Transparency = 1
+			elseif v:IsA("ForceField") then
+				v.Visible = false
+			elseif v:IsA("Sound") then
+				v.Playing = false
+			elseif v:IsA("BillboardGui") or v:IsA("SurfaceGui") or v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") then
+				v.Enabled = false
+			end
+		end
+	end
+end
+
+if newanimate then
+	local animate = gp(c, "Animate", "LocalScript")
+	if animate then
+		animate.Disabled = false
+	end
+end
+
+if addtools then
+	for i, v in pairs(c:GetChildren()) do
+		if v:IsA("Tool") then
+			v.Parent = addtools
+		end
+	end
+end
+
+local hum0 = model:FindFirstChildOfClass("Humanoid")
+if hum0 then
+    hum0.Destroying:Connect(function()
+        hum0 = nil
+    end)
+end
+
+local hum1 = c:FindFirstChildOfClass("Humanoid")
+if hum1 then
+    hum1.Destroying:Connect(function()
+        hum1 = nil
+    end)
+end
+
+if hum1 then
+	ws.CurrentCamera.CameraSubject = hum1
+	local camSubCon = nil
+	local function camSubFunc()
+		camSubCon:Disconnect()
+		if c and hum1 then
+			ws.CurrentCamera.CameraSubject = hum1
+		end
+	end
+	camSubCon = renderstepped:Connect(camSubFunc)
+	if hum0 then
+		hum0.Changed:Connect(function(prop)
+			if hum1 and (prop == "Jump") then
+				hum1.Jump = hum0.Jump
+			end
+		end)
+	else
+		respawnrequest()
+	end
+end
+
+local rb = Instance.new("BindableEvent", c)
+rb.Event:Connect(function()
+	rb:Destroy()
+	sg:SetCore("ResetButtonCallback", true)
+	if destroyhum then
+		c:BreakJoints()
+		return
+	end
+	if hum0 and (hum0.Health > 0) then
+		model:BreakJoints()
+		hum0.Health = 0
+	end
+	if antirespawn then
+	    respawnrequest()
+	end
+end)
+sg:SetCore("ResetButtonCallback", rb)
+
+spawn(function()
+	while c do
+		if hum0 and hum1 then
+			hum1.Jump = hum0.Jump
+		end
+		wait()
+	end
+	sg:SetCore("ResetButtonCallback", true)
+end)
+
+R15toR6 = R15toR6 and hum1 and (hum1.RigType == Enum.HumanoidRigType.R15)
+if R15toR6 then
+    local part = gp(c, "HumanoidRootPart", "BasePart") or gp(c, "UpperTorso", "BasePart") or gp(c, "LowerTorso", "BasePart") or gp(c, "Head", "BasePart") or c:FindFirstChildWhichIsA("BasePart")
+	if part then
+	    local cfr = part.CFrame
+		local R6parts = { 
+			head = {
+				Name = "Head",
+				Size = v3(2, 1, 1),
+				R15 = {
+					Head = 0
+				}
+			},
+			torso = {
+				Name = "Torso",
+				Size = v3(2, 2, 1),
+				R15 = {
+					UpperTorso = 0.2,
+					LowerTorso = -100
+				}
+			},
+			root = {
+				Name = "HumanoidRootPart",
+				Size = v3(2, 2, 1),
+				R15 = {
+					HumanoidRootPart = 0
+				}
+			},
+			leftArm = {
+				Name = "Left Arm",
+				Size = v3(1, 2, 1),
+				R15 = {
+					LeftHand = -0.73,
+					LeftLowerArm = -0.2,
+					LeftUpperArm = 0.4
+				}
+			},
+			rightArm = {
+				Name = "Right Arm",
+				Size = v3(1, 2, 1),
+				R15 = {
+					RightHand = -0.73,
+					RightLowerArm = -0.2,
+					RightUpperArm = 0.4
+				}
+			},
+			leftLeg = {
+				Name = "Left Leg",
+				Size = v3(1, 2, 1),
+				R15 = {
+					LeftFoot = -0.73,
+					LeftLowerLeg = -0.15,
+					LeftUpperLeg = 0.6
+				}
+			},
+			rightLeg = {
+				Name = "Right Leg",
+				Size = v3(1, 2, 1),
+				R15 = {
+					RightFoot = -0.73,
+					RightLowerLeg = -0.15,
+					RightUpperLeg = 0.6
+				}
+			}
+		}
+		for i, v in pairs(c:GetChildren()) do
+			if v:IsA("BasePart") then
+				for i1, v1 in pairs(v:GetChildren()) do
+					if v1:IsA("Motor6D") then
+						v1.Part0 = nil
+					end
+				end
+			end
+		end
+		part.Archivable = true
+		for i, v in pairs(R6parts) do
+			local part = part:Clone()
+			part:ClearAllChildren()
+			part.Name = v.Name
+			part.Size = v.Size
+			part.CFrame = cfr
+			part.Anchored = false
+			part.Transparency = 1
+			part.CanCollide = false
+			for i1, v1 in pairs(v.R15) do
+				local R15part = gp(c, i1, "BasePart")
+				local att = gp(R15part, "att1_" .. i1, "Attachment")
+				if R15part then
+					local weld = Instance.new("Weld", R15part)
+					weld.Name = "Weld_" .. i1
+					weld.Part0 = part
+					weld.Part1 = R15part
+					weld.C0 = cf(0, v1, 0)
+					weld.C1 = cf(0, 0, 0)
+					R15part.Massless = true
+					R15part.Name = "R15_" .. i1
+					R15part.Parent = part
+					if att then
+						att.Parent = part
+						att.Position = v3(0, v1, 0)
+					end
+				end
+			end
+			part.Parent = c
+			R6parts[i] = part
+		end
+		local R6joints = {
+			neck = {
+				Parent = R6parts.torso,
+				Name = "Neck",
+				Part0 = R6parts.torso,
+				Part1 = R6parts.head,
+				C0 = cf(0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0),
+				C1 = cf(0, -0.5, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0)
+			},
+			rootJoint = {
+				Parent = R6parts.root,
+				Name = "RootJoint" ,
+				Part0 = R6parts.root,
+				Part1 = R6parts.torso,
+				C0 = cf(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0),
+				C1 = cf(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, -0)
+			},
+			rightShoulder = {
+				Parent = R6parts.torso,
+				Name = "Right Shoulder",
+				Part0 = R6parts.torso,
+				Part1 = R6parts.rightArm,
+				C0 = cf(1, 0.5, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+				C1 = cf(-0.5, 0.5, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+			},
+			leftShoulder = {
+				Parent = R6parts.torso,
+				Name = "Left Shoulder",
+				Part0 = R6parts.torso,
+				Part1 = R6parts.leftArm,
+				C0 = cf(-1, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
+				C1 = cf(0.5, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+			},
+			rightHip = {
+				Parent = R6parts.torso,
+				Name = "Right Hip",
+				Part0 = R6parts.torso,
+				Part1 = R6parts.rightLeg,
+				C0 = cf(1, -1, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+				C1 = cf(0.5, 1, 0, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+			},
+			leftHip = {
+				Parent = R6parts.torso,
+				Name = "Left Hip" ,
+				Part0 = R6parts.torso,
+				Part1 = R6parts.leftLeg,
+				C0 = cf(-1, -1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
+				C1 = cf(-0.5, 1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+			}
+		}
+		for i, v in pairs(R6joints) do
+			local joint = Instance.new("Motor6D")
+			for prop, val in pairs(v) do
+				joint[prop] = val
+			end
+			R6joints[i] = joint
+		end
+		hum1.RigType = Enum.HumanoidRigType.R6
+		hum1.HipHeight = 0
+	end
+end
+
+
+
+--find rig joints
+
+local function fakemotor()
+    return {C0=cf(), C1=cf()}
+end
+
+local torso = gp(c, "Torso", "BasePart")
+local root = gp(c, "HumanoidRootPart", "BasePart")
+
+local neck = gp(torso, "Neck", "Motor6D")
+neck = neck or fakemotor()
+
+local rootJoint = gp(root, "RootJoint", "Motor6D")
+rootJoint = rootJoint or fakemotor()
+
+local leftShoulder = gp(torso, "Left Shoulder", "Motor6D")
+leftShoulder = leftShoulder or fakemotor()
+
+local rightShoulder = gp(torso, "Right Shoulder", "Motor6D")
+rightShoulder = rightShoulder or fakemotor()
+
+local leftHip = gp(torso, "Left Hip", "Motor6D")
+leftHip = leftHip or fakemotor()
+
+local rightHip = gp(torso, "Right Hip", "Motor6D")
+rightHip = rightHip or fakemotor()
+
+--120 fps
+
+local fps = 40
+local event = Instance.new("BindableEvent", c)
+event.Name = "120 fps"
+local floor = math.floor
+fps = 1 / fps
+local tf = 0
+local con = nil
+con = game:GetService("RunService").RenderStepped:Connect(function(s)
+	if not c then
+		con:Disconnect()
+		return
+	end
+    --tf += s
+	if tf >= fps then
+		for i=1, floor(tf / fps) do
+			event:Fire(c)
+		end
+		tf = 0
+	end
+end)
+local event = event.Event
+
+local hedrot = v3(0, 5, 0)
+
+local uis = game:GetService("UserInputService")
+local function isPressed(key)
+    return (not uis:GetFocusedTextBox()) and uis:IsKeyDown(Enum.KeyCode[key])
+end
+
+local biggesthandle = nil
+for i, v in pairs(c:GetChildren()) do
+    if v:IsA("Accessory") then
+        local handle = gp(v, "Handle", "BasePart")
+        if biggesthandle then
+            if biggesthandle.Size.Magnitude < handle.Size.Magnitude then
+                biggesthandle = handle
+            end
+        else
+            biggesthandle = gp(v, "Handle", "BasePart")
+        end
+    end
+end
+
+if not biggesthandle then
+    return
+end
+
+local handle1 = gp(gp(model, biggesthandle.Parent.Name, "Accessory"), "Handle", "BasePart")
+if not handle1 then
+    return
+end
+
+handle1.Destroying:Connect(function()
+    handle1 = nil
+end)
+biggesthandle.Destroying:Connect(function()
+    biggesthandle = nil
+end)
+
+biggesthandle:BreakJoints()
+biggesthandle.Anchored = true
+
+for i, v in pairs(handle1:GetDescendants()) do
+    if v:IsA("AlignOrientation") then
+        v.Enabled = false
+    end
+end
+
+local mouse = lp:GetMouse()
+local fling = false
+mouse.Button1Down:Connect(function()
+    fling = true
+end)
+mouse.Button1Up:Connect(function()
+    fling = false
+end)
+local function doForSignal(signal, vel)
+    spawn(function()
+        while signal:Wait() and c and handle1 and biggesthandle do
+            if fling and mouse.Target then
+                biggesthandle.Position = mouse.Hit.Position
+            end
+            handle1.RotVelocity = vel
+        end
+    end)
+end
+doForSignal(stepped, v3(100, 100, 100))
+doForSignal(renderstepped, v3(100, 100, 100))
+doForSignal(heartbeat, v3(20000, 20000, 20000)) --https://web.roblox.com/catalog/63690008/Pal-Hair
+
+local lp = game:GetService("Players").LocalPlayer
+local rs = game:GetService("RunService")
+local stepped = rs.Stepped
+local heartbeat = rs.Heartbeat
+local renderstepped = rs.RenderStepped
+local sg = game:GetService("StarterGui")
+local ws = game:GetService("Workspace")
+local cf = CFrame.new
+local v3 = Vector3.new
+local v3_0 = Vector3.zero
+local inf = math.huge
+
+local cplayer = lp.Character
+
+local v3 = Vector3.new
+
+local function gp(parent, name, className)
+    if typeof(parent) == "Instance" then
+        for i, v in pairs(parent:GetChildren()) do
+            if (v.Name == name) and v:IsA(className) then
+                return v
+            end
+        end
+    end
+    return nil
+end
+
+local hat2 = gp(cplayer, "LUAhEAD", "Accessory")
+local handle2 = gp(hat2, "Handle", "BasePart")
+local att2 = gp(handle2, "att1_Handle", "Attachment")
+att2.Parent = cplayer["Torso"]
+att2.Position = Vector3.new(-0, -0, 0)
+att2.Rotation = Vector3.new(90, 0, 0)
+
+
+local hat2 = gp(cplayer, "Pink Hair", "Accessory")
+local handle2 = gp(hat2, "Handle", "BasePart")
+local att2 = gp(handle2, "att1_Handle", "Attachment")
+att2.Parent = cplayer["Left Arm"]
+att2.Position = Vector3.new(0, -0, 0)
+att2.Rotation = Vector3.new(90, 0, 0)
+
+local hat2 = gp(cplayer, "Kate Hair", "Accessory")
+local handle2 = gp(hat2, "Handle", "BasePart")
+local att2 = gp(handle2, "att1_Handle", "Attachment")
+att2.Parent = cplayer["Right Arm"]
+att2.Position = Vector3.new(0, -0, 0)
+att2.Rotation = Vector3.new(90, 0, 0) --LavanderHair
+
+local hat2 = gp(cplayer, "LavanderHair", "Accessory")
+local handle2 = gp(hat2, "Handle", "BasePart")
+local att2 = gp(handle2, "att1_Handle", "Attachment")
+att2.Parent = cplayer["Right Leg"]
+att2.Position = Vector3.new(0, -0, 0) --Robloxclassicred
+att2.Rotation = Vector3.new(90, 0, 0)
+
+local hat2 = gp(cplayer, "Robloxclassicred", "Accessory")
+local handle2 = gp(hat2, "Handle", "BasePart")
+local att2 = gp(handle2, "att1_Handle", "Attachment")
+att2.Parent = cplayer["Left Leg"]
+att2.Position = Vector3.new(0, -0, 0) --Robloxclassicred
+att2.Rotation = Vector3.new(90, 0, 0) --Back_AccAccessory
+
+local hat2 = gp(cplayer, "Back_AccAccessory", "Accessory")
+local handle2 = gp(hat2, "Handle", "BasePart")
+local att2 = gp(handle2, "att1_Handle", "Attachment")
+att2.Parent = cplayer["Right Arm"]
+att2.Position = Vector3.new(0, -2.5, 0) --Robloxclassicred
+att2.Rotation = Vector3.new(40, 90, 0) --bloxcxy
+
+local hat2 = gp(cplayer, "Battle Beam", "Accessory")
+local handle2 = gp(hat2, "Handle", "BasePart")
+local att2 = gp(handle2, "att1_Handle", "Attachment")
+att2.Parent = cplayer["Left Arm"]
+att2.Position = Vector3.new(0, -2.5, 0) --Robloxclassicred
+att2.Rotation = Vector3.new(60, 0, 0)
+
+print([[
+___________________________________
+  
+Kyutatsuki13's Homura script
+Build 0002.5
+Vengeful's custom script request
+(You must see her boobies lmao)
+  
+___________________________________
+]])
+
+warn("200R$ has been spent for this.")
+
+
+local p = game:GetService("Players").LocalPlayer 
+local char = p.Character
+local mouse = p:GetMouse()
+local larm = char:WaitForChild("Left Arm")
+local rarm = char:WaitForChild("Right Arm")
+local lleg = char:WaitForChild("Left Leg")
+local rleg = char:WaitForChild("Right Leg")
+local hed = char:WaitForChild("Head")
+local torso = char:WaitForChild("Torso")
+local root = char:WaitForChild("HumanoidRootPart")
+local hum = char:FindFirstChildOfClass("Humanoid")
+local debris = game:GetService("Debris")
+local input = game:GetService("UserInputService")
+local run = game:GetService("RunService")
+local rs = run.RenderStepped
+local wingpose = "Idle"
+local DebrisModel = Instance.new("Model",char)
+DebrisModel.Name = "Debris"
+repeat rs:wait() until p.CharacterAppearanceLoaded
+
+noidle = false
+shift = false
+control = false
+no_nosound_able = true
+jumped = false
+
+----------------------------------------------------------------------------
+
+function rswait(value)
+  if value ~= nil and value ~= 0 then
+    for i=1,value do
+     rs:wait()
+    end
+  else
+    rs:wait()
+  end
+end
+
+----------------------------------------------------------------------------
+
+local timeposition = 0
+
+function music(id)
+if not torso:FindFirstChild("MusicRuin") then
+soundz = Instance.new("Sound",torso)
+end
+soundz.Volume = 10
+soundz.Name = "MusicRuin"
+soundz.Looped = true
+soundz.PlaybackSpeed = 1
+soundz.SoundId = "rbxassetid://"..id
+soundz:Stop()
+soundz:Play()
+if no_nosound_able == true then
+soundz.TimePosition = timeposition
+end
+end
+
+----------------------------------------------------------------------------
+
+function lerp(a, b, t)
+  return a + (b - a)*t
+end
+
+----------------------------------------------------------------------------
+
+function Lerp(c1,c2,al)
+  local com1 = {c1.X,c1.Y,c1.Z,c1:toEulerAnglesXYZ()}
+  local com2 = {c2.X,c2.Y,c2.Z,c2:toEulerAnglesXYZ()}
+  for i,v in pairs(com1) do
+    com1[i] = v+(com2[i]-v)*al
+  end
+  return CFrame.new(com1[1],com1[2],com1[3]) * CFrame.Angles(select(4,unpack(com1)))
+end
+
+----------------------------------------------------------------------------
+
+function slerp(a, b, t)
+  dot = a:Dot(b)
+  if dot > 0.99999 or dot < -0.99999 then
+    return t <= 0.5 and a or b
+  else
+    r = math.acos(dot)
+    return (a*math.sin((1 - t)*r) + b*math.sin(t*r)) / math.sin(r)
+  end
+end
+
+----------------------------------------------------------------------------
+
+function clerp(c1,c2,al)
+
+  local com1 = {c1.X,c1.Y,c1.Z,c1:toEulerAnglesXYZ()}
+
+  local com2 = {c2.X,c2.Y,c2.Z,c2:toEulerAnglesXYZ()}
+
+  for i,v in pairs(com1) do
+
+    com1[i] = lerp(v,com2[i],al)
+
+  end
+
+  return CFrame.new(com1[1],com1[2],com1[3]) * CFrame.Angles(select(4,unpack(com1)))
+
+end
+
+----------------------------------------------------------------------------
+
+function findAllNearestTorso(pos,dist)
+    local list = workspace:children()
+    local torso = {}
+    local temp = nil
+    local human = nil
+    local temp2 = nil
+    for x = 1, #list do
+        temp2 = list[x]
+        if (temp2.className == "Model") and (temp2 ~= char) then
+            temp = temp2:findFirstChild("Torso")
+            human = temp2:findFirstChildOfClass("Humanoid")
+            if (temp ~= nil) and (human ~= nil) and (human.Health > 0) then
+                if (temp.Position - pos).magnitude < dist then
+                    table.insert(torso,temp)
+                    dist = (temp.Position - pos).magnitude
+                end
+            end
+        end
+    end
+    return torso
+end
+
+----------------------------------------------------------------------------
+
+function checkIfNotPlayer(model)
+if model.CanCollide == true and model ~= char and model.Parent ~= char and model.Parent.Parent ~= char and model.Parent.Parent ~= char and model.Parent ~= DebrisModel and model.Parent.Parent ~= DebrisModel and model.Parent.Parent.Parent ~= DebrisModel and model ~= wings and model.Parent ~= wings and model.Parent.Parent ~= wings then
+return true
+else
+return false
+end
+end
+
+----------------------------------------------------------------------------
+
+function newWeld(wp0, wp1, wc0x, wc0y, wc0z)
+
+  local wld = Instance.new("Weld", wp1)
+
+  wld.Part0 = wp0
+
+  wld.Part1 = wp1
+
+  wld.C0 = CFrame.new(wc0x, wc0y, wc0z)
+
+  return wld
+
+end
+
+function weld(model)
+  local parts,last = {}
+  local function scan(parent)
+    for _,v in pairs(parent:GetChildren()) do
+      if (v:IsA("BasePart")) then
+        if (last) then
+          local w = Instance.new("Weld")
+          w.Name = ("%s_Weld"):format(v.Name)
+          w.Part0,w.Part1 = last,v
+          w.C0 = last.CFrame:inverse()
+          w.C1 = v.CFrame:inverse()
+          w.Parent = last
+        end
+        last = v
+        table.insert(parts,v)
+      end
+      scan(v)
+    end
+  end
+  scan(model)
+  for _,v in pairs(parts) do
+        v.Anchored = false
+        v.Locked = true
+        v.Anchored = false
+        v.BackSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.FrontSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.LeftSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.RightSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.TopSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.CustomPhysicalProperties = PhysicalProperties.new(0,0,0)
+  end
+end
+
+----------------------------------------------------------------------------
+
+function calculate(part,asd)
+local Head = hed
+local RightShoulder = asd
+local RightArm = part
+local MousePosition = mouse.Hit.p
+local ToMouse = (MousePosition - Head.Position).unit
+local Angle = math.acos(ToMouse:Dot(Vector3.new(0, 1, 0)))
+local FromRightArmPos = (Head.Position + Head.CFrame:vectorToWorldSpace(Vector3.new(((Head.Size.X / 2) + (RightArm.Size.X / 2)), ((Head.Size.Y / 2) - (RightArm.Size.Z / 2)), 0)))
+local ToMouseRightArm = ((MousePosition - FromRightArmPos) * Vector3.new(1 ,0, 1)).unit
+local Look = (Head.CFrame.lookVector * Vector3.new(1, 0, 1)).unit
+local LateralAngle = math.acos(ToMouseRightArm:Dot(Look))
+if tostring(LateralAngle) == "-1.#IND" then
+LateralAngle = 0
+end
+local Cross = Head.CFrame.lookVector:Cross(ToMouseRightArm)
+if LateralAngle > (math.pi / 2) then
+LateralAngle = (math.pi / 2)
+local Torso = root
+local Point = Torso.CFrame:vectorToObjectSpace(mouse.Hit.p-Torso.CFrame.p)
+if Point.Z > 0 then
+if Point.X > -0 and RightArm == rarm then
+Torso.CFrame = CFrame.new(Torso.Position,Vector3.new(mouse.Hit.X,Torso.Position.Y,mouse.Hit.Z))*CFrame.Angles(0,math.rad(110),0)
+elseif Point.X < 0 and RightArm == rarm then
+Torso.CFrame = CFrame.new(Torso.Position,Vector3.new(mouse.Hit.X,Torso.Position.Y,mouse.Hit.Z))*CFrame.Angles(0,math.rad(-110),0)
+end
+end
+end
+if Cross.Y < 0 then
+LateralAngle = -LateralAngle
+end
+return(CFrame.Angles(((math.pi / 2) - Angle), ((math.pi / 2) + LateralAngle), math.pi/2))
+end
+
+----------------------------------------------------------------------------
+
+function random(min,max,multiplied)
+return math.random(min,max)/multiplied
+end
+
+----------------------------------------------------------------------------
+
+function sound(id,position,vol,pitch,start,finish)
+  coroutine.resume(coroutine.create(function()
+
+  local part = Instance.new("Part",workspace)
+  part.Position = position
+  part.Size = Vector3.new(0,0,0)
+  part.CanCollide = false
+  part.Transparency = 1
+
+  local sound = Instance.new("Sound",part)
+
+  sound.SoundId = "rbxassetid://"..id
+
+  repeat rs:wait() until sound.IsLoaded
+  
+  if vol ~= nil then
+    sound.Volume = vol
+  end
+
+  if pitch ~= nil then
+    sound.PlaybackSpeed = pitch
+  end
+
+  if start ~= nil then
+    sound.TimePosition = start
+  end
+
+  if finish ~= nil then
+    debris:AddItem(part,finish-start)
+  else
+    debris:AddItem(part,sound.TimeLength)
+  end
+  
+  sound:Play()  
+
+  return sound
+
+  end))
+end
+comboid = {}
+comboid[1] = 1591834623
+comboid[2] = 1591835384
+comboid[3] = 1591835860
+comboid[4] = 1591836776
+comboid[5] = 1591837308
+comboid[6] = 1591838011
+comboid[7] = 1591838398
+comboid[8] = 1591840045
+comboid[9] = 1591840538
+comboid[10] = 1591841249
+
+combosfx = {}
+for i=1,10 do
+local sound = Instance.new("Sound",script)
+sound.Volume = 5
+sound.SoundId = "rbxassetid://"..comboid[i]
+sound.Name = i
+combosfx[i] = sound
+end
+----------------------------------------------------------------------------
+
+function computeDirection(vec)
+local lenSquared = vec.magnitude * vec.magnitude
+local invSqrt = 1 / math.sqrt(lenSquared)
+return Vector3.new(vec.x * invSqrt, vec.y * invSqrt, vec.z * invSqrt)
+end
+
+----------------------------------------------------------------------------
+
+plr = game:GetService("Players").LocalPlayer
+DebrisModel = Instance.new("Model",plr.Character)
+DebrisModel.Name = "DebrisModel"
+
+effect = {}
+
+function Effect(mesh,size,transparency,material,color,position,rotation,positionchange,sizechange,rotationchange,transparencychange,acceleration)
+ 
+ local part = Instance.new("Part",DebrisModel)
+  part.Anchored = true
+  part.CanCollide = false
+  part.Size = Vector3.new(1,1,1)
+  part.Transparency = transparency
+  part.Material = material
+  part.Color = color
+  part.CFrame = CFrame.new(position)*CFrame.Angles(math.rad(rotation.X),math.rad(rotation.Y),math.rad(rotation.Z))
+ 
+ local partmesh = Instance.new("SpecialMesh",part)
+  if tonumber(mesh) == nil then partmesh.MeshType = mesh else partmesh.MeshId = "rbxassetid://"..mesh end
+  partmesh.Scale = size
+
+ local pvalue = Instance.new("Vector3Value",part)
+  pvalue.Name = "Position"
+  pvalue.Value = positionchange
+
+ local svalue = Instance.new("Vector3Value",part)
+  svalue.Name = "Size"
+  svalue.Value = sizechange
+
+ local rvalue = Instance.new("Vector3Value",part)
+  rvalue.Name = "Rotation"
+  rvalue.Value = rotationchange
+  
+ local tvalue = Instance.new("NumberValue",part)
+  tvalue.Name = "Transparency"
+  tvalue.Value = transparencychange
+
+ local avalue = Instance.new("NumberValue",part)
+  avalue.Name = "Acceleration"
+  avalue.Value = acceleration
+ 
+ part.Name = "EFFECT"
+ 
+ table.insert(effect,part)
+ 
+ return part
+
+end
+
+coroutine.resume(coroutine.create(function()
+while true do rs:wait()
+
+ if not plr.Character:FindFirstChild("DebrisModel") then
+  DebrisModel = Instance.new("Model",plr.Character)
+  DebrisModel.Name = "DebrisModel"
+ end
+
+if #effect > 0 then
+for i=1,#effect do
+if effect[i] ~= nil then
+local v = effect[i]
+   local pvalue = v:FindFirstChild("Position").Value
+   local svalue = v:FindFirstChild("Size").Value
+   local rvalue = v:FindFirstChild("Rotation").Value
+   local tvalue = v:FindFirstChild("Transparency").Value
+   local avalue = v:FindFirstChild("Acceleration").Value
+   local mesh = v:FindFirstChild("Mesh")
+   mesh.Scale = mesh.Scale + svalue
+   v:FindFirstChild("Size").Value = v:FindFirstChild("Size").Value + (Vector3.new(1,1,1)*avalue)
+   v.Transparency = v.Transparency + tvalue
+   v.CFrame = CFrame.new(pvalue)*v.CFrame*CFrame.Angles(math.rad(rvalue.X),math.rad(rvalue.Y),math.rad(rvalue.Z))
+   if v.Transparency >= 1 or mesh.Scale.X < 0 or mesh.Scale.Y < 0 or mesh.Scale.Z < 0 then
+     v.Parent = nil
+     table.remove(effect,i)
+   end
+  end
+end
+end
+
+end
+end))
+
+----------------------------------------------------------------------------
+
+local WorldUp = Vector3.new(0,1,0)
+function look2(Vec1,Vec2)
+   local Orig = Vec1
+   Vec1 = Vec1+Vector3.new(0,1,0)
+   Vec2 = Vec2+Vector3.new(0,1,0)
+   local Forward = (Vec2-Vec1).unit
+   local Up = (WorldUp-WorldUp:Dot(Forward)*Forward).unit
+   local Right = Up:Cross(Forward).unit
+   Forward = -Forward
+   Right = -Right
+   return CFrame.new(Orig.X,Orig.Y,Orig.Z,Right.X,Up.X,Forward.X,Right.Y,Up.Y,Forward.Y,Right.Z,Up.Z,Forward.Z)
+end
+
+function look(CFr,Vec2)
+   local A = Vector3.new(0,0,0)
+   local B = CFr:inverse()*Vec2
+   local CF = look2(A,Vector3.new(A.X,B.Y,B.Z))
+   if B.Z > 0 then
+       CF = CFr*(CF*CFrame.Angles(0,0,math.pi))
+   elseif B.Z == 0 then
+       if B.Y > 0 then
+           CF = CFr*CFrame.Angles(math.pi/2,0,0)
+       elseif B.Y < 0 then
+           CF = CFr*CFrame.Angles(-math.pi/2,0,0)
+       else
+           CF = CFr
+       end
+   end
+   local _,_,_,_,X,_,_,Y,_,_,Z,_ = CF:components()
+   local Up = Vector3.new(X,Y,Z)
+   local Forward = (Vec2-CFr.p).unit
+   local Right = Up:Cross(Forward)
+   Forward = -Forward
+   Right = -Right
+   return CFrame.new(CFr.X,CFr.Y,CFr.Z,Right.X,Up.X,Forward.X,Right.Y,Up.Y,Forward.Y,Right.Z,Up.Z,Forward.Z)
+end
+
+function simulate(j,d,m,r,t)
+       local joint = j
+       for i,v in ipairs(t) do
+               if v[1]:FindFirstChild("Weld") then
+                       local stiff = m.CFrame.lookVector*0.001
+                       if i > 1 then joint = t[i-1][1].CFrame*CFrame.new(0,0,d*.5) end
+                       local dir = (v[2].p-(joint.p+Vector3.new(0,0.07,0)+stiff)).unit
+                       local dis = (v[2].p-(joint.p+Vector3.new(0,0.07,0)+stiff)).magnitude
+                       local pos = joint.p+(dir*(d*0.5))
+                     --if v[1].CFrame.y<=workspace.Base.CFrame.y then pos = joint.p+(dir*(d*.5)) end
+                       local inv = v[1].Weld.Part0.CFrame
+                       local rel1 = inv:inverse()*pos
+                       local rel2 = inv:inverse()*(pos-(dir*dis))
+                       local cf = look(CFrame.new(rel1),rel2)--CFrame.new(pos,pos-(dir*dis))*CFrame.fromEulerAnglesXYZ(r.x,r.y,r.z)
+                       v[1].Weld.C0 = Lerp(v[1].Weld.C0,cf*CFrame.Angles(math.rad(-360-90),math.rad(0),math.rad(0)),0.4)
+                       v[2] = inv*cf
+                       --v[1].CFrame = cf
+               end
+       end
+end
+
+----------------------------------------------------------------------------
+skin_color = BrickColor.new("Light orange")
+hed:WaitForChild("face"):Destroy()
+--p:ClearCharacterAppearance()
+
+hat = Instance.new("Part",hed)
+hat.CanCollide = false
+hat.Color = Color3.fromRGB(40, 40, 40)
+hatmesh = Instance.new("SpecialMesh",hat)
+hatmesh.MeshId = "rbxassetid://0"
+hatmesh.Scale = Vector3.new(0.6,0.6,0.6)
+newWeld(hed,hat,0,0,0)
+hat.Weld.C0 = CFrame.new(0,-0.2,0.1)*CFrame.Angles(math.rad(15),math.rad(180),math.rad(0))
+
+hat = Instance.new("Part",hed)
+hat.CanCollide = false
+hat.Color = Color3.fromRGB(40, 40, 40)
+hatmesh = Instance.new("SpecialMesh",hat)
+hatmesh.MeshId = "rbxassetid://0"
+hatmesh.Scale = Vector3.new(0.7,0.7,0.7)
+newWeld(hed,hat,0,0,0)
+hat.Weld.C0 = CFrame.new(0.12,0.2,0)*CFrame.Angles(math.rad(0),math.rad(180),math.rad(0))
+
+hair={}
+hairz = Instance.new("Part",hed)
+hairz.CanCollide = false
+hairz.Color = Color3.fromRGB(40, 40, 40)
+hairz.Size = Vector3.new()
+hatmesh = Instance.new("SpecialMesh",hairz)
+hatmesh.MeshId = "rbxassetid://0"
+hatmesh.Scale = Vector3.new(0.3,1,0.3)
+hairz:BreakJoints()
+local w = Instance.new("Motor6D",hairz)
+w.Part0 = hair[1-1] and hair[1-1][1] or torso
+w.Part1 = hairz
+w.Name = "Weld"
+w.C1 = CFrame.new(0,1.2,0.2)
+w.C1 = w.C1*CFrame.Angles(math.rad(180),math.rad(0),math.rad(180))
+hair[1] = {hairz,hairz.CFrame}
+
+Model0 = Instance.new("Model")
+Part1 = Instance.new("Part")
+Part2 = Instance.new("Part")
+Part3 = Instance.new("Part")
+Part4 = Instance.new("Part")
+Part5 = Instance.new("Part")
+Part6 = Instance.new("Part")
+Part7 = Instance.new("Part")
+Part8 = Instance.new("Part")
+Part9 = Instance.new("Part")
+Part10 = Instance.new("Part")
+Part11 = Instance.new("Part")
+Part12 = Instance.new("Part")
+Part13 = Instance.new("Part")
+Part14 = Instance.new("Part")
+Model0.Parent = char
+Part1.Parent = Model0
+Part1.Rotation = Vector3.new(0, 0, -15)
+Part1.Anchored = true
+Part1.CanCollide = false
+Part1.Size = Vector3.new(0.199999958, 1.60000002, 0.100000001)
+Part1.CFrame = CFrame.new(13.3949995, 21.2308884, 6.98250198, 0.965925574, 0.258819729, 0, -0.258819729, 0.965925574, 0, 0, 0, 1)
+Part1.BottomSurface = Enum.SurfaceType.Smooth
+Part1.TopSurface = Enum.SurfaceType.Smooth
+Part1.Position = Vector3.new(13.3949995, 21.2308884, 6.98250198)
+Part1.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part2.Parent = Model0
+Part2.Rotation = Vector3.new(0, 0, -10)
+Part2.Anchored = true
+Part2.CanCollide = false
+Part2.Size = Vector3.new(0.239999965, 0.13000001, 0.140000015)
+Part2.CFrame = CFrame.new(13.795537, 21.6192799, 6.98250198, 0.984807611, 0.173648745, 0, -0.173648745, 0.984807611, 0, 0, 0, 1)
+Part2.BottomSurface = Enum.SurfaceType.Smooth
+Part2.TopSurface = Enum.SurfaceType.Smooth
+Part2.Position = Vector3.new(13.795537, 21.6192799, 6.98250198)
+Part2.Color = Color3.new(0.423529, 0.345098, 0.294118)
+Part3.Name = "asd"
+Part3.Parent = Model0
+Part3.Transparency = 1
+Part3.Anchored = true
+Part3.CanCollide = false
+Part3.Size = Vector3.new(2, 2, 1)
+Part3.CFrame = CFrame.new(14, 21.824646, 6.42750168, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part3.BottomSurface = Enum.SurfaceType.Smooth
+Part3.TopSurface = Enum.SurfaceType.Smooth
+Part3.Position = Vector3.new(14, 21.824646, 6.42750168)
+Part3.Color = Color3.new(1, 0.8, 0.6)
+Part4.Parent = Model0
+Part4.Rotation = Vector3.new(0, 0, 10)
+Part4.Anchored = true
+Part4.CanCollide = false
+Part4.Size = Vector3.new(0.239999965, 0.13000001, 0.140000015)
+Part4.CFrame = CFrame.new(14.204463, 21.6192799, 6.98250198, 0.984807611, -0.173648745, 0, 0.173648745, 0.984807611, 0, 0, 0, 1)
+Part4.BottomSurface = Enum.SurfaceType.Smooth
+Part4.TopSurface = Enum.SurfaceType.Smooth
+Part4.Position = Vector3.new(14.204463, 21.6192799, 6.98250198)
+Part4.Color = Color3.new(0.423529, 0.345098, 0.294118)
+Part5.Parent = Model0
+Part5.Rotation = Vector3.new(0, 0, -25)
+Part5.Anchored = true
+Part5.CanCollide = false
+Part5.Size = Vector3.new(0.199999958, 1.60000002, 0.100000001)
+Part5.CFrame = CFrame.new(12.9899998, 21.2658882, 6.98250198, 0.906307638, 0.422618568, 0, -0.422618568, 0.906307638, 0, 0, 0, 1)
+Part5.BottomSurface = Enum.SurfaceType.Smooth
+Part5.TopSurface = Enum.SurfaceType.Smooth
+Part5.Position = Vector3.new(12.9899998, 21.2658882, 6.98250198)
+Part5.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part6.Parent = Model0
+Part6.Rotation = Vector3.new(0, 0, -15)
+Part6.Anchored = true
+Part6.CanCollide = false
+Part6.Size = Vector3.new(0.239999965, 0.13000001, 0.140000015)
+Part6.CFrame = CFrame.new(13.5075865, 21.6510658, 6.98250198, 0.965925574, 0.258819729, 0, -0.258819729, 0.965925574, 0, 0, 0, 1)
+Part6.BottomSurface = Enum.SurfaceType.Smooth
+Part6.TopSurface = Enum.SurfaceType.Smooth
+Part6.Position = Vector3.new(13.5075865, 21.6510658, 6.98250198)
+Part6.Color = Color3.new(0.423529, 0.345098, 0.294118)
+Part7.Parent = Model0
+Part7.Rotation = Vector3.new(0, 0, 25)
+Part7.Anchored = true
+Part7.CanCollide = false
+Part7.Size = Vector3.new(0.199999958, 1.60000002, 0.100000001)
+Part7.CFrame = CFrame.new(15.0100002, 21.2658882, 6.98250198, 0.906307638, -0.422618568, 0, 0.422618568, 0.906307638, 0, 0, 0, 1)
+Part7.BottomSurface = Enum.SurfaceType.Smooth
+Part7.TopSurface = Enum.SurfaceType.Smooth
+Part7.Position = Vector3.new(15.0100002, 21.2658882, 6.98250198)
+Part7.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part8.Parent = Model0
+Part8.Rotation = Vector3.new(0, 0, -25)
+Part8.Anchored = true
+Part8.CanCollide = false
+Part8.Size = Vector3.new(0.239999965, 0.13000001, 0.140000015)
+Part8.CFrame = CFrame.new(13.1738396, 21.6601334, 6.98250198, 0.906307638, 0.422618568, 0, -0.422618568, 0.906307638, 0, 0, 0, 1)
+Part8.BottomSurface = Enum.SurfaceType.Smooth
+Part8.TopSurface = Enum.SurfaceType.Smooth
+Part8.Position = Vector3.new(13.1738396, 21.6601334, 6.98250198)
+Part8.Color = Color3.new(0.423529, 0.345098, 0.294118)
+Part9.Parent = Model0
+Part9.Anchored = true
+Part9.CanCollide = false
+Part9.Size = Vector3.new(2.06000018, 0.26000005, 1.06000006)
+Part9.CFrame = CFrame.new(14, 21.6546459, 6.42750168, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part9.BottomSurface = Enum.SurfaceType.Smooth
+Part9.TopSurface = Enum.SurfaceType.Smooth
+Part9.Position = Vector3.new(14, 21.6546459, 6.42750168)
+Part9.Color = Color3.new(0.423529, 0.345098, 0.294118)
+Part10.Parent = Model0
+Part10.Rotation = Vector3.new(0, 0, 25)
+Part10.Anchored = true
+Part10.CanCollide = false
+Part10.Size = Vector3.new(0.239999965, 0.13000001, 0.140000015)
+Part10.CFrame = CFrame.new(14.8261604, 21.6601334, 6.98250198, 0.906307638, -0.422618568, 0, 0.422618568, 0.906307638, 0, 0, 0, 1)
+Part10.BottomSurface = Enum.SurfaceType.Smooth
+Part10.TopSurface = Enum.SurfaceType.Smooth
+Part10.Position = Vector3.new(14.8261604, 21.6601334, 6.98250198)
+Part10.Color = Color3.new(0.423529, 0.345098, 0.294118)
+Part11.Parent = Model0
+Part11.Rotation = Vector3.new(0, 0, -10)
+Part11.Anchored = true
+Part11.CanCollide = false
+Part11.Size = Vector3.new(0.199999958, 1.60000002, 0.100000001)
+Part11.CFrame = CFrame.new(13.7200003, 21.1908894, 6.98250198, 0.984807611, 0.173648745, 0, -0.173648745, 0.984807611, 0, 0, 0, 1)
+Part11.BottomSurface = Enum.SurfaceType.Smooth
+Part11.TopSurface = Enum.SurfaceType.Smooth
+Part11.Position = Vector3.new(13.7200003, 21.1908894, 6.98250198)
+Part11.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part12.Parent = Model0
+Part12.Rotation = Vector3.new(0, 0, 15)
+Part12.Anchored = true
+Part12.CanCollide = false
+Part12.Size = Vector3.new(0.239999965, 0.13000001, 0.140000015)
+Part12.CFrame = CFrame.new(14.4924135, 21.6510658, 6.98250198, 0.965925574, -0.258819729, 0, 0.258819729, 0.965925574, 0, 0, 0, 1)
+Part12.BottomSurface = Enum.SurfaceType.Smooth
+Part12.TopSurface = Enum.SurfaceType.Smooth
+Part12.Position = Vector3.new(14.4924135, 21.6510658, 6.98250198)
+Part12.Color = Color3.new(0.423529, 0.345098, 0.294118)
+Part13.Parent = Model0
+Part13.Rotation = Vector3.new(0, 0, 15)
+Part13.Anchored = true
+Part13.CanCollide = false
+Part13.Size = Vector3.new(0.199999958, 1.60000002, 0.100000001)
+Part13.CFrame = CFrame.new(14.6050005, 21.2308884, 6.98250198, 0.965925574, -0.258819729, 0, 0.258819729, 0.965925574, 0, 0, 0, 1)
+Part13.BottomSurface = Enum.SurfaceType.Smooth
+Part13.TopSurface = Enum.SurfaceType.Smooth
+Part13.Position = Vector3.new(14.6050005, 21.2308884, 6.98250198)
+Part13.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part14.Parent = Model0
+Part14.Rotation = Vector3.new(0, 0, 10)
+Part14.Anchored = true
+Part14.CanCollide = false
+Part14.Size = Vector3.new(0.199999958, 1.60000002, 0.100000001)
+Part14.CFrame = CFrame.new(14.2799997, 21.1908894, 6.98250198, 0.984807611, -0.173648745, 0, 0.173648745, 0.984807611, 0, 0, 0, 1)
+Part14.BottomSurface = Enum.SurfaceType.Smooth
+Part14.TopSurface = Enum.SurfaceType.Smooth
+Part14.Position = Vector3.new(14.2799997, 21.1908894, 6.98250198)
+Part14.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+weld(Model0)
+newWeld(torso,Model0.asd,0,0,0)
+
+Model0 = Instance.new("Model")
+Part1 = Instance.new("Part")
+SpecialMesh2 = Instance.new("SpecialMesh")
+Part3 = Instance.new("Part")
+SpecialMesh4 = Instance.new("SpecialMesh")
+Part5 = Instance.new("Part")
+BlockMesh6 = Instance.new("BlockMesh")
+Part7 = Instance.new("Part")
+SpecialMesh8 = Instance.new("SpecialMesh")
+Part9 = Instance.new("Part")
+Part10 = Instance.new("Part")
+SpecialMesh11 = Instance.new("SpecialMesh")
+Part12 = Instance.new("Part")
+Part13 = Instance.new("Part")
+BlockMesh14 = Instance.new("BlockMesh")
+Part15 = Instance.new("Part")
+WedgePart16 = Instance.new("WedgePart")
+Part17 = Instance.new("Part")
+SpecialMesh18 = Instance.new("SpecialMesh")
+Part19 = Instance.new("Part")
+SpecialMesh20 = Instance.new("SpecialMesh")
+Part21 = Instance.new("Part")
+BlockMesh22 = Instance.new("BlockMesh")
+Part23 = Instance.new("Part")
+Part24 = Instance.new("Part")
+Part25 = Instance.new("Part")
+BlockMesh26 = Instance.new("BlockMesh")
+Part27 = Instance.new("Part")
+Part28 = Instance.new("Part")
+SpecialMesh29 = Instance.new("SpecialMesh")
+Part30 = Instance.new("Part")
+SpecialMesh31 = Instance.new("SpecialMesh")
+Part32 = Instance.new("Part")
+Part33 = Instance.new("Part")
+Part34 = Instance.new("Part")
+SpecialMesh35 = Instance.new("SpecialMesh")
+Part36 = Instance.new("Part")
+SpecialMesh37 = Instance.new("SpecialMesh")
+Part38 = Instance.new("Part")
+SpecialMesh39 = Instance.new("SpecialMesh")
+Part40 = Instance.new("Part")
+SpecialMesh41 = Instance.new("SpecialMesh")
+WedgePart42 = Instance.new("WedgePart")
+Part43 = Instance.new("Part")
+Part44 = Instance.new("Part")
+SpecialMesh45 = Instance.new("SpecialMesh")
+Part46 = Instance.new("Part")
+Part47 = Instance.new("Part")
+WedgePart48 = Instance.new("WedgePart")
+Part49 = Instance.new("Part")
+SpecialMesh50 = Instance.new("SpecialMesh")
+Part51 = Instance.new("Part")
+SpecialMesh52 = Instance.new("SpecialMesh")
+Part53 = Instance.new("Part")
+SpecialMesh54 = Instance.new("SpecialMesh")
+Part55 = Instance.new("Part")
+BlockMesh56 = Instance.new("BlockMesh")
+WedgePart57 = Instance.new("WedgePart")
+Part58 = Instance.new("Part")
+WedgePart59 = Instance.new("WedgePart")
+Part60 = Instance.new("Part")
+SpecialMesh61 = Instance.new("SpecialMesh")
+Part62 = Instance.new("Part")
+Part63 = Instance.new("Part")
+Part64 = Instance.new("Part")
+SpecialMesh65 = Instance.new("SpecialMesh")
+Part66 = Instance.new("Part")
+SpecialMesh67 = Instance.new("SpecialMesh")
+Part68 = Instance.new("Part")
+SpecialMesh69 = Instance.new("SpecialMesh")
+Part70 = Instance.new("Part")
+SpecialMesh71 = Instance.new("SpecialMesh")
+Part72 = Instance.new("Part")
+Part73 = Instance.new("Part")
+WedgePart74 = Instance.new("WedgePart")
+Part75 = Instance.new("Part")
+SpecialMesh76 = Instance.new("SpecialMesh")
+Part77 = Instance.new("Part")
+SpecialMesh78 = Instance.new("SpecialMesh")
+Part79 = Instance.new("Part")
+Part80 = Instance.new("Part")
+Part81 = Instance.new("Part")
+SpecialMesh82 = Instance.new("SpecialMesh")
+Part83 = Instance.new("Part")
+BlockMesh84 = Instance.new("BlockMesh")
+Part85 = Instance.new("Part")
+BlockMesh86 = Instance.new("BlockMesh")
+Part87 = Instance.new("Part")
+BlockMesh88 = Instance.new("BlockMesh")
+Part89 = Instance.new("Part")
+BlockMesh90 = Instance.new("BlockMesh")
+Part91 = Instance.new("Part")
+Part92 = Instance.new("Part")
+SpecialMesh93 = Instance.new("SpecialMesh")
+Part94 = Instance.new("Part")
+SpecialMesh95 = Instance.new("SpecialMesh")
+WedgePart96 = Instance.new("WedgePart")
+Part97 = Instance.new("Part")
+Part98 = Instance.new("Part")
+BlockMesh99 = Instance.new("BlockMesh")
+Part100 = Instance.new("Part")
+SpecialMesh101 = Instance.new("SpecialMesh")
+Part102 = Instance.new("Part")
+SpecialMesh103 = Instance.new("SpecialMesh")
+Part104 = Instance.new("Part")
+Part105 = Instance.new("Part")
+SpecialMesh106 = Instance.new("SpecialMesh")
+Part107 = Instance.new("Part")
+SpecialMesh108 = Instance.new("SpecialMesh")
+Part109 = Instance.new("Part")
+SpecialMesh110 = Instance.new("SpecialMesh")
+Part111 = Instance.new("Part")
+SpecialMesh112 = Instance.new("SpecialMesh")
+Part113 = Instance.new("Part")
+SpecialMesh114 = Instance.new("SpecialMesh")
+Part115 = Instance.new("Part")
+SpecialMesh116 = Instance.new("SpecialMesh")
+WedgePart117 = Instance.new("WedgePart")
+Part118 = Instance.new("Part")
+Part119 = Instance.new("Part")
+SpecialMesh120 = Instance.new("SpecialMesh")
+Part121 = Instance.new("Part")
+Part122 = Instance.new("Part")
+SpecialMesh123 = Instance.new("SpecialMesh")
+Part124 = Instance.new("Part")
+Model0.Parent = char
+Part1.Parent = Model0
+Part1.Rotation = Vector3.new(-90, 0, -90)
+Part1.Anchored = true
+Part1.CanCollide = false
+Part1.Size = Vector3.new(0.26000008, 0.180000097, 0.770000041)
+Part1.CFrame = CFrame.new(14.0900002, 23.8749981, -21.4300003, 8.74227837e-08, 0.99999994, -1.31134158e-07, -4.37113741e-08, 1.31134158e-07, 1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part1.BottomSurface = Enum.SurfaceType.Smooth
+Part1.TopSurface = Enum.SurfaceType.Smooth
+Part1.Position = Vector3.new(14.0900002, 23.8749981, -21.4300003)
+Part1.Color = Color3.new(1, 0, 0)
+SpecialMesh2.Parent = Part1
+SpecialMesh2.MeshType = Enum.MeshType.Wedge
+Part3.Parent = Model0
+Part3.Rotation = Vector3.new(90, 0, 90)
+Part3.Anchored = true
+Part3.CanCollide = false
+Part3.Size = Vector3.new(0.240000054, 0.190000102, 0.230000004)
+Part3.CFrame = CFrame.new(13.9049997, 24.3749981, -21.4300003, -8.74227766e-08, -0.99999994, 4.37113847e-08, 4.37113812e-08, -4.37113847e-08, -1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part3.BottomSurface = Enum.SurfaceType.Smooth
+Part3.TopSurface = Enum.SurfaceType.Smooth
+Part3.Position = Vector3.new(13.9049997, 24.3749981, -21.4300003)
+Part3.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh4.Parent = Part3
+SpecialMesh4.MeshType = Enum.MeshType.Wedge
+Part5.Parent = Model0
+Part5.Anchored = true
+Part5.CanCollide = false
+Part5.Size = Vector3.new(0.110000156, 0.0500000007, 1.24000001)
+Part5.CFrame = CFrame.new(12.9350004, 22.6999989, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part5.BottomSurface = Enum.SurfaceType.Smooth
+Part5.TopSurface = Enum.SurfaceType.Smooth
+Part5.Position = Vector3.new(12.9350004, 22.6999989, -21)
+Part5.Color = Color3.new(1, 0, 0)
+BlockMesh6.Parent = Part5
+BlockMesh6.Scale = Vector3.new(1, 0.400000691, 1)
+BlockMesh6.Scale = Vector3.new(1, 0.400000691, 1)
+Part7.Parent = Model0
+Part7.Rotation = Vector3.new(90, 0, 90)
+Part7.Anchored = true
+Part7.CanCollide = false
+Part7.Size = Vector3.new(0.220000058, 0.190000102, 0.189999998)
+Part7.CFrame = CFrame.new(14.1350002, 24.4449997, -21.4300003, 8.74227766e-08, -0.99999994, -1.31134158e-07, 4.37113883e-08, 1.31134158e-07, -1, 0.99999994, 8.74227695e-08, 4.37113954e-08)
+Part7.BottomSurface = Enum.SurfaceType.Smooth
+Part7.TopSurface = Enum.SurfaceType.Smooth
+Part7.Position = Vector3.new(14.1350002, 24.4449997, -21.4300003)
+Part7.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh8.Parent = Part7
+SpecialMesh8.MeshType = Enum.MeshType.Wedge
+Part9.Parent = Model0
+Part9.Anchored = true
+Part9.CanCollide = false
+Part9.Size = Vector3.new(0.150000051, 0.170000046, 1.08000004)
+Part9.CFrame = CFrame.new(14.4949999, 24.664999, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part9.BottomSurface = Enum.SurfaceType.Smooth
+Part9.TopSurface = Enum.SurfaceType.Smooth
+Part9.Position = Vector3.new(14.4949999, 24.664999, -21)
+Part9.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part10.Parent = Model0
+Part10.Rotation = Vector3.new(90, 0, 90)
+Part10.Anchored = true
+Part10.CanCollide = false
+Part10.Size = Vector3.new(0.200000048, 0.210000113, 0.209999993)
+Part10.CFrame = CFrame.new(14.125, 24.4449997, -21.4300003, 8.74227766e-08, -0.99999994, -1.31134158e-07, 4.37113883e-08, 1.31134158e-07, -1, 0.99999994, 8.74227695e-08, 4.37113954e-08)
+Part10.BottomSurface = Enum.SurfaceType.Smooth
+Part10.TopSurface = Enum.SurfaceType.Smooth
+Part10.Position = Vector3.new(14.125, 24.4449997, -21.4300003)
+Part10.Color = Color3.new(1, 0, 0)
+SpecialMesh11.Parent = Part10
+SpecialMesh11.MeshType = Enum.MeshType.Wedge
+Part12.Parent = Model0
+Part12.Rotation = Vector3.new(-111.040001, -90, 0)
+Part12.Anchored = true
+Part12.CanCollide = false
+Part12.Size = Vector3.new(0.278567731, 0.100000001, 2.02000022)
+Part12.CFrame = CFrame.new(14, 22.8620491, -20.4866676, 0, -0, -1, 0.933345556, -0.358979136, 0, -0.358979136, -0.933345556, 0)
+Part12.BottomSurface = Enum.SurfaceType.Smooth
+Part12.TopSurface = Enum.SurfaceType.Smooth
+Part12.Position = Vector3.new(14, 22.8620491, -20.4866676)
+Part12.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part13.Parent = Model0
+Part13.Anchored = true
+Part13.CanCollide = false
+Part13.Size = Vector3.new(2.24000025, 0.0500000007, 0.120000005)
+Part13.CFrame = CFrame.new(14, 22.6999989, -21.5599995, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part13.BottomSurface = Enum.SurfaceType.Smooth
+Part13.TopSurface = Enum.SurfaceType.Smooth
+Part13.Position = Vector3.new(14, 22.6999989, -21.5599995)
+Part13.Color = Color3.new(1, 0, 0)
+BlockMesh14.Parent = Part13
+BlockMesh14.Scale = Vector3.new(1, 0.400000691, 1)
+BlockMesh14.Scale = Vector3.new(1, 0.400000691, 1)
+Part15.Parent = Model0
+Part15.Anchored = true
+Part15.CanCollide = false
+Part15.Size = Vector3.new(0.170000061, 0.170000046, 1.06000006)
+Part15.CFrame = CFrame.new(14.4949999, 24.6549988, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part15.BottomSurface = Enum.SurfaceType.Smooth
+Part15.TopSurface = Enum.SurfaceType.Smooth
+Part15.Position = Vector3.new(14.4949999, 24.6549988, -21)
+Part15.Color = Color3.new(1, 0, 0)
+WedgePart16.Parent = Model0
+WedgePart16.Rotation = Vector3.new(90, 21.039999, 180)
+WedgePart16.Anchored = true
+WedgePart16.CanCollide = false
+WedgePart16.Size = Vector3.new(0.100000001, 0.100000001, 0.278567731)
+WedgePart16.CFrame = CFrame.new(15.0133324, 22.8620491, -21.5599995, -0.933345497, -7.21807822e-08, 0.358979225, -0.358979225, 6.59041746e-08, -0.933345497, 4.37113847e-08, -0.99999994, -8.74227695e-08)
+WedgePart16.BottomSurface = Enum.SurfaceType.Smooth
+WedgePart16.Position = Vector3.new(15.0133324, 22.8620491, -21.5599995)
+WedgePart16.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part17.Parent = Model0
+Part17.Rotation = Vector3.new(-90, 0, -90)
+Part17.Anchored = true
+Part17.CanCollide = false
+Part17.Size = Vector3.new(0.180000052, 0.360000104, 0.230000004)
+Part17.CFrame = CFrame.new(14.4099998, 24.4449997, -21.4300003, 8.74227695e-08, 0.99999994, 4.37113918e-08, -4.37113883e-08, -4.37113847e-08, 1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part17.BottomSurface = Enum.SurfaceType.Smooth
+Part17.TopSurface = Enum.SurfaceType.Smooth
+Part17.Position = Vector3.new(14.4099998, 24.4449997, -21.4300003)
+Part17.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh18.Parent = Part17
+SpecialMesh18.MeshType = Enum.MeshType.Wedge
+Part19.Parent = Model0
+Part19.Rotation = Vector3.new(-90, 0, 90)
+Part19.Anchored = true
+Part19.CanCollide = false
+Part19.Size = Vector3.new(0.240000054, 0.190000102, 0.780000031)
+Part19.CFrame = CFrame.new(13.9049997, 23.8699989, -21.4300003, 9.55342711e-15, -0.99999994, -2.18556934e-07, -4.37113883e-08, -2.1855692e-07, 1, -0.99999994, 0, -4.37113847e-08)
+Part19.BottomSurface = Enum.SurfaceType.Smooth
+Part19.TopSurface = Enum.SurfaceType.Smooth
+Part19.Position = Vector3.new(13.9049997, 23.8699989, -21.4300003)
+Part19.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh20.Parent = Part19
+SpecialMesh20.MeshType = Enum.MeshType.Wedge
+Part21.Parent = Model0
+Part21.Anchored = true
+Part21.CanCollide = false
+Part21.Size = Vector3.new(0.780000091, 0.220000029, 0.0500000007)
+Part21.CFrame = CFrame.new(14.6199999, 24.4399986, -21.4899998, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part21.BottomSurface = Enum.SurfaceType.Smooth
+Part21.TopSurface = Enum.SurfaceType.Smooth
+Part21.Position = Vector3.new(14.6199999, 24.4399986, -21.4899998)
+Part21.Color = Color3.new(0.105882, 0.164706, 0.207843)
+BlockMesh22.Parent = Part21
+BlockMesh22.Scale = Vector3.new(1, 1, 0.799999237)
+BlockMesh22.Scale = Vector3.new(1, 1, 0.799999237)
+Part23.Parent = Model0
+Part23.Anchored = true
+Part23.CanCollide = false
+Part23.Size = Vector3.new(2.22000003, 0.100000039, 0.100000001)
+Part23.CFrame = CFrame.new(14, 22.6999989, -20.4400005, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part23.BottomSurface = Enum.SurfaceType.Smooth
+Part23.TopSurface = Enum.SurfaceType.Smooth
+Part23.Position = Vector3.new(14, 22.6999989, -20.4400005)
+Part23.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part24.Parent = Model0
+Part24.Anchored = true
+Part24.CanCollide = false
+Part24.Size = Vector3.new(2.02000022, 0.220000029, 0.179999933)
+Part24.CFrame = CFrame.new(14, 24.4399986, -20.5799999, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part24.BottomSurface = Enum.SurfaceType.Smooth
+Part24.TopSurface = Enum.SurfaceType.Smooth
+Part24.Position = Vector3.new(14, 24.4399986, -20.5799999)
+Part24.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part25.Parent = Model0
+Part25.Anchored = true
+Part25.CanCollide = false
+Part25.Size = Vector3.new(2.24000025, 0.0500000007, 0.120000005)
+Part25.CFrame = CFrame.new(14, 22.6999989, -20.4400005, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part25.BottomSurface = Enum.SurfaceType.Smooth
+Part25.TopSurface = Enum.SurfaceType.Smooth
+Part25.Position = Vector3.new(14, 22.6999989, -20.4400005)
+Part25.Color = Color3.new(1, 0, 0)
+BlockMesh26.Parent = Part25
+BlockMesh26.Scale = Vector3.new(1, 0.400000691, 1)
+BlockMesh26.Scale = Vector3.new(1, 0.400000691, 1)
+Part27.Parent = Model0
+Part27.Anchored = true
+Part27.CanCollide = false
+Part27.Size = Vector3.new(1.18000007, 0.440000057, 0.100000001)
+Part27.CFrame = CFrame.new(14, 24.5099983, -20.5300007, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part27.BottomSurface = Enum.SurfaceType.Smooth
+Part27.TopSurface = Enum.SurfaceType.Smooth
+Part27.Position = Vector3.new(14, 24.5099983, -20.5300007)
+Part27.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part28.Parent = Model0
+Part28.Rotation = Vector3.new(-90, 0, -90)
+Part28.Anchored = true
+Part28.CanCollide = false
+Part28.Size = Vector3.new(0.220000058, 0.300000101, 0.189999983)
+Part28.CFrame = CFrame.new(14.3800001, 24.4449997, -21.4300003, 8.74227695e-08, 0.99999994, 4.37113918e-08, -4.37113883e-08, -4.37113847e-08, 1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part28.BottomSurface = Enum.SurfaceType.Smooth
+Part28.TopSurface = Enum.SurfaceType.Smooth
+Part28.Position = Vector3.new(14.3800001, 24.4449997, -21.4300003)
+Part28.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh29.Parent = Part28
+SpecialMesh29.MeshType = Enum.MeshType.Wedge
+Part30.Parent = Model0
+Part30.Rotation = Vector3.new(90, 0, 90)
+Part30.Anchored = true
+Part30.CanCollide = false
+Part30.Size = Vector3.new(0.240000054, 0.160000086, 0.330000013)
+Part30.CFrame = CFrame.new(13.9200001, 23.7549992, -21.4300003, -8.74227908e-08, -0.99999994, 2.18556934e-07, 4.3711367e-08, -2.1855692e-07, -1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part30.BottomSurface = Enum.SurfaceType.Smooth
+Part30.TopSurface = Enum.SurfaceType.Smooth
+Part30.Position = Vector3.new(13.9200001, 23.7549992, -21.4300003)
+Part30.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh31.Parent = Part30
+SpecialMesh31.MeshType = Enum.MeshType.Wedge
+Part32.Parent = Model0
+Part32.Anchored = true
+Part32.CanCollide = false
+Part32.Size = Vector3.new(0.150000051, 0.170000046, 1.08000004)
+Part32.CFrame = CFrame.new(13.5050001, 24.664999, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part32.BottomSurface = Enum.SurfaceType.Smooth
+Part32.TopSurface = Enum.SurfaceType.Smooth
+Part32.Position = Vector3.new(13.5050001, 24.664999, -21)
+Part32.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part33.Name = "asd"
+Part33.Parent = Model0
+Part33.Transparency = 1
+Part33.Anchored = true
+Part33.CanCollide = false
+Part33.Size = Vector3.new(2, 2, 1)
+Part33.CFrame = CFrame.new(14, 23.7099991, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part33.BottomSurface = Enum.SurfaceType.Smooth
+Part33.TopSurface = Enum.SurfaceType.Smooth
+Part33.Position = Vector3.new(14, 23.7099991, -21)
+Part33.Color = Color3.new(1, 0.8, 0.6)
+Part34.Parent = Model0
+Part34.Rotation = Vector3.new(90, 0, 90)
+Part34.Anchored = true
+Part34.CanCollide = false
+Part34.Size = Vector3.new(0.180000052, 0.230000094, 0.230000004)
+Part34.CFrame = CFrame.new(14.1149998, 24.4449997, -21.4300003, 8.74227766e-08, -0.99999994, -1.31134158e-07, 4.37113883e-08, 1.31134158e-07, -1, 0.99999994, 8.74227695e-08, 4.37113954e-08)
+Part34.BottomSurface = Enum.SurfaceType.Smooth
+Part34.TopSurface = Enum.SurfaceType.Smooth
+Part34.Position = Vector3.new(14.1149998, 24.4449997, -21.4300003)
+Part34.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh35.Parent = Part34
+SpecialMesh35.MeshType = Enum.MeshType.Wedge
+Part36.Parent = Model0
+Part36.Rotation = Vector3.new(-90, 0, 90)
+Part36.Anchored = true
+Part36.CanCollide = false
+Part36.Size = Vector3.new(0.26000008, 0.15000008, 0.160000011)
+Part36.CFrame = CFrame.new(13.9250002, 23.5099983, -21.4300003, 1.71961681e-14, -0.99999994, -3.93402502e-07, -4.37113883e-08, -3.93402445e-07, 1, -0.99999994, 0, -4.37113847e-08)
+Part36.BottomSurface = Enum.SurfaceType.Smooth
+Part36.TopSurface = Enum.SurfaceType.Smooth
+Part36.Position = Vector3.new(13.9250002, 23.5099983, -21.4300003)
+Part36.Color = Color3.new(1, 0, 0)
+SpecialMesh37.Parent = Part36
+SpecialMesh37.MeshType = Enum.MeshType.Wedge
+Part38.Parent = Model0
+Part38.Rotation = Vector3.new(-90, 0, 90)
+Part38.Anchored = true
+Part38.CanCollide = false
+Part38.Size = Vector3.new(0.280000061, 0.170000091, 0.76000005)
+Part38.CFrame = CFrame.new(13.915, 23.8799992, -21.4300003, 9.55342711e-15, -0.99999994, -2.18556934e-07, -4.37113883e-08, -2.1855692e-07, 1, -0.99999994, 0, -4.37113847e-08)
+Part38.BottomSurface = Enum.SurfaceType.Smooth
+Part38.TopSurface = Enum.SurfaceType.Smooth
+Part38.Position = Vector3.new(13.915, 23.8799992, -21.4300003)
+Part38.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh39.Parent = Part38
+SpecialMesh39.MeshType = Enum.MeshType.Wedge
+Part40.Parent = Model0
+Part40.Rotation = Vector3.new(-90, 0, 90)
+Part40.Anchored = true
+Part40.CanCollide = false
+Part40.Size = Vector3.new(0.240000054, 0.160000086, 0.170000017)
+Part40.CFrame = CFrame.new(13.9200001, 23.5049992, -21.4300003, 1.71961681e-14, -0.99999994, -3.93402502e-07, -4.37113883e-08, -3.93402445e-07, 1, -0.99999994, 0, -4.37113847e-08)
+Part40.BottomSurface = Enum.SurfaceType.Smooth
+Part40.TopSurface = Enum.SurfaceType.Smooth
+Part40.Position = Vector3.new(13.9200001, 23.5049992, -21.4300003)
+Part40.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh41.Parent = Part40
+SpecialMesh41.MeshType = Enum.MeshType.Wedge
+WedgePart42.Parent = Model0
+WedgePart42.Rotation = Vector3.new(0, 0, -21.039999)
+WedgePart42.Anchored = true
+WedgePart42.CanCollide = false
+WedgePart42.Size = Vector3.new(0.100000001, 0.278567731, 0.100000195)
+WedgePart42.CFrame = CFrame.new(12.9866676, 22.8620491, -21.5599995, 0.933345556, 0.358979166, -5.02127051e-08, -0.358979166, 0.933345556, 1.12978611e-07, 8.74227837e-08, -8.74227695e-08, 1)
+WedgePart42.BottomSurface = Enum.SurfaceType.Smooth
+WedgePart42.Position = Vector3.new(12.9866676, 22.8620491, -21.5599995)
+WedgePart42.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part43.Parent = Model0
+Part43.Rotation = Vector3.new(0, 0, 111.040001)
+Part43.Anchored = true
+Part43.CanCollide = false
+Part43.Size = Vector3.new(0.278567731, 0.100000001, 1.01999998)
+Part43.CFrame = CFrame.new(15.0133324, 22.8620491, -21, -0.358979106, -0.933345556, 0, 0.933345497, -0.358979136, 0, 0, -0, 0.99999994)
+Part43.BottomSurface = Enum.SurfaceType.Smooth
+Part43.TopSurface = Enum.SurfaceType.Smooth
+Part43.Position = Vector3.new(15.0133324, 22.8620491, -21)
+Part43.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part44.Parent = Model0
+Part44.Rotation = Vector3.new(90, 0, -90)
+Part44.Anchored = true
+Part44.CanCollide = false
+Part44.Size = Vector3.new(0.240000054, 0.160000086, 0.330000013)
+Part44.CFrame = CFrame.new(14.0799999, 23.7549992, -21.4300003, -1.33747976e-14, 0.99999994, 3.05979711e-07, 4.37113883e-08, 3.05979682e-07, -1, -0.99999994, 0, -4.37113847e-08)
+Part44.BottomSurface = Enum.SurfaceType.Smooth
+Part44.TopSurface = Enum.SurfaceType.Smooth
+Part44.Position = Vector3.new(14.0799999, 23.7549992, -21.4300003)
+Part44.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh45.Parent = Part44
+SpecialMesh45.MeshType = Enum.MeshType.Wedge
+Part46.Parent = Model0
+Part46.Anchored = true
+Part46.CanCollide = false
+Part46.Size = Vector3.new(1.13999999, 0.120000005, 0.0500000007)
+Part46.CFrame = CFrame.new(14, 24.3699989, -20.4850006, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part46.BottomSurface = Enum.SurfaceType.Smooth
+Part46.TopSurface = Enum.SurfaceType.Smooth
+Part46.Position = Vector3.new(14, 24.3699989, -20.4850006)
+Part46.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part47.Parent = Model0
+Part47.Anchored = true
+Part47.CanCollide = false
+Part47.Size = Vector3.new(0.600000083, 0.390000045, 1.01999998)
+Part47.CFrame = CFrame.new(13.29, 24.5249996, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part47.BottomSurface = Enum.SurfaceType.Smooth
+Part47.TopSurface = Enum.SurfaceType.Smooth
+Part47.Position = Vector3.new(13.29, 24.5249996, -21)
+Part47.Color = Color3.new(0.105882, 0.164706, 0.207843)
+WedgePart48.Parent = Model0
+WedgePart48.Rotation = Vector3.new(21.039999, -90, 0)
+WedgePart48.Anchored = true
+WedgePart48.CanCollide = false
+WedgePart48.Size = Vector3.new(0.100000001, 0.278567731, 0.100000001)
+WedgePart48.CFrame = CFrame.new(15.0600004, 22.8620491, -21.5133324, -8.74227837e-08, 8.74227695e-08, -1, -0.358979166, 0.933345556, 1.12978611e-07, 0.933345556, 0.358979166, -5.02127051e-08)
+WedgePart48.BottomSurface = Enum.SurfaceType.Smooth
+WedgePart48.Position = Vector3.new(15.0600004, 22.8620491, -21.5133324)
+WedgePart48.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part49.Parent = Model0
+Part49.Rotation = Vector3.new(-90, 0, 90)
+Part49.Anchored = true
+Part49.CanCollide = false
+Part49.Size = Vector3.new(0.220000058, 0.300000101, 0.189999983)
+Part49.CFrame = CFrame.new(13.6199999, 24.4449997, -21.4300003, 1.91068547e-15, -0.99999994, -4.37113883e-08, -4.37113883e-08, -4.37113847e-08, 1, -0.99999994, 0, -4.37113847e-08)
+Part49.BottomSurface = Enum.SurfaceType.Smooth
+Part49.TopSurface = Enum.SurfaceType.Smooth
+Part49.Position = Vector3.new(13.6199999, 24.4449997, -21.4300003)
+Part49.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh50.Parent = Part49
+SpecialMesh50.MeshType = Enum.MeshType.Wedge
+Part51.Parent = Model0
+Part51.Rotation = Vector3.new(-90, 0, 90)
+Part51.Anchored = true
+Part51.CanCollide = false
+Part51.Size = Vector3.new(0.180000052, 0.360000104, 0.230000004)
+Part51.CFrame = CFrame.new(13.5900002, 24.4449997, -21.4300003, 1.91068547e-15, -0.99999994, -4.37113883e-08, -4.37113883e-08, -4.37113847e-08, 1, -0.99999994, 0, -4.37113847e-08)
+Part51.BottomSurface = Enum.SurfaceType.Smooth
+Part51.TopSurface = Enum.SurfaceType.Smooth
+Part51.Position = Vector3.new(13.5900002, 24.4449997, -21.4300003)
+Part51.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh52.Parent = Part51
+SpecialMesh52.MeshType = Enum.MeshType.Wedge
+Part53.Parent = Model0
+Part53.Rotation = Vector3.new(-90, 0, -90)
+Part53.Anchored = true
+Part53.CanCollide = false
+Part53.Size = Vector3.new(0.26000008, 0.15000008, 0.160000011)
+Part53.CFrame = CFrame.new(14.0749998, 23.5099983, -21.4300003, 8.74227979e-08, 0.99999994, -3.05979711e-07, -4.37113599e-08, 3.05979682e-07, 1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part53.BottomSurface = Enum.SurfaceType.Smooth
+Part53.TopSurface = Enum.SurfaceType.Smooth
+Part53.Position = Vector3.new(14.0749998, 23.5099983, -21.4300003)
+Part53.Color = Color3.new(1, 0, 0)
+SpecialMesh54.Parent = Part53
+SpecialMesh54.MeshType = Enum.MeshType.Wedge
+Part55.Parent = Model0
+Part55.Anchored = true
+Part55.CanCollide = false
+Part55.Size = Vector3.new(0.78000015, 0.220000029, 0.0500000007)
+Part55.CFrame = CFrame.new(13.3800001, 24.4399986, -21.4899998, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part55.BottomSurface = Enum.SurfaceType.Smooth
+Part55.TopSurface = Enum.SurfaceType.Smooth
+Part55.Position = Vector3.new(13.3800001, 24.4399986, -21.4899998)
+Part55.Color = Color3.new(0.105882, 0.164706, 0.207843)
+BlockMesh56.Parent = Part55
+BlockMesh56.Scale = Vector3.new(1, 1, 0.799999237)
+BlockMesh56.Scale = Vector3.new(1, 1, 0.799999237)
+WedgePart57.Parent = Model0
+WedgePart57.Rotation = Vector3.new(-21.039999, 90, 0)
+WedgePart57.Anchored = true
+WedgePart57.CanCollide = false
+WedgePart57.Size = Vector3.new(0.100000001, 0.278567731, 0.100000001)
+WedgePart57.CFrame = CFrame.new(12.9399996, 22.8620491, -20.4866676, 8.74227837e-08, -8.74227695e-08, 1, -0.358979166, 0.933345556, 1.12978611e-07, -0.933345556, -0.358979166, 5.02127051e-08)
+WedgePart57.BottomSurface = Enum.SurfaceType.Smooth
+WedgePart57.Position = Vector3.new(12.9399996, 22.8620491, -20.4866676)
+WedgePart57.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part58.Parent = Model0
+Part58.Anchored = true
+Part58.CanCollide = false
+Part58.Size = Vector3.new(0.150000051, 0.440000027, 0.0500000007)
+Part58.CFrame = CFrame.new(14.4949999, 24.5299988, -20.4850006, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part58.BottomSurface = Enum.SurfaceType.Smooth
+Part58.TopSurface = Enum.SurfaceType.Smooth
+Part58.Position = Vector3.new(14.4949999, 24.5299988, -20.4850006)
+Part58.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+WedgePart59.Parent = Model0
+WedgePart59.Rotation = Vector3.new(68.9599991, 0, -90)
+WedgePart59.Anchored = true
+WedgePart59.CanCollide = false
+WedgePart59.Size = Vector3.new(0.100000001, 0.100000001, 0.278567731)
+WedgePart59.CFrame = CFrame.new(15.0600004, 22.8620491, -20.4866676, -4.37113847e-08, 0.99999994, 8.74227695e-08, -0.358979225, 6.59041746e-08, -0.933345497, -0.933345497, -7.21807822e-08, 0.358979225)
+WedgePart59.BottomSurface = Enum.SurfaceType.Smooth
+WedgePart59.Position = Vector3.new(15.0600004, 22.8620491, -20.4866676)
+WedgePart59.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part60.Parent = Model0
+Part60.Rotation = Vector3.new(90, 0, -90)
+Part60.Anchored = true
+Part60.CanCollide = false
+Part60.Size = Vector3.new(0.26000008, 0.180000097, 0.209999993)
+Part60.CFrame = CFrame.new(14.0900002, 24.3649979, -21.4300003, -5.73205661e-15, 0.99999994, 1.31134158e-07, 4.37113883e-08, 1.31134158e-07, -1, -0.99999994, 0, -4.37113847e-08)
+Part60.BottomSurface = Enum.SurfaceType.Smooth
+Part60.TopSurface = Enum.SurfaceType.Smooth
+Part60.Position = Vector3.new(14.0900002, 24.3649979, -21.4300003)
+Part60.Color = Color3.new(1, 0, 0)
+SpecialMesh61.Parent = Part60
+SpecialMesh61.MeshType = Enum.MeshType.Wedge
+Part62.Parent = Model0
+Part62.Anchored = true
+Part62.CanCollide = false
+Part62.Size = Vector3.new(0.190000057, 0.170000046, 1.04000008)
+Part62.CFrame = CFrame.new(14.4949999, 24.6449986, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part62.BottomSurface = Enum.SurfaceType.Smooth
+Part62.TopSurface = Enum.SurfaceType.Smooth
+Part62.Position = Vector3.new(14.4949999, 24.6449986, -21)
+Part62.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part63.Parent = Model0
+Part63.Anchored = true
+Part63.CanCollide = false
+Part63.Size = Vector3.new(2.22000003, 0.100000039, 0.100000001)
+Part63.CFrame = CFrame.new(14, 22.6999989, -21.5599995, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part63.BottomSurface = Enum.SurfaceType.Smooth
+Part63.TopSurface = Enum.SurfaceType.Smooth
+Part63.Position = Vector3.new(14, 22.6999989, -21.5599995)
+Part63.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part64.Parent = Model0
+Part64.Rotation = Vector3.new(-90, 0, -90)
+Part64.Anchored = true
+Part64.CanCollide = false
+Part64.Size = Vector3.new(0.280000061, 0.170000091, 0.76000005)
+Part64.CFrame = CFrame.new(14.085, 23.8799992, -21.4300003, 8.74227837e-08, 0.99999994, -1.31134158e-07, -4.37113741e-08, 1.31134158e-07, 1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part64.BottomSurface = Enum.SurfaceType.Smooth
+Part64.TopSurface = Enum.SurfaceType.Smooth
+Part64.Position = Vector3.new(14.085, 23.8799992, -21.4300003)
+Part64.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh65.Parent = Part64
+SpecialMesh65.MeshType = Enum.MeshType.Wedge
+Part66.Parent = Model0
+Part66.Rotation = Vector3.new(90, 0, 90)
+Part66.Anchored = true
+Part66.CanCollide = false
+Part66.Size = Vector3.new(0.26000008, 0.180000097, 0.209999993)
+Part66.CFrame = CFrame.new(13.9099998, 24.3649979, -21.4300003, -8.74227766e-08, -0.99999994, 4.37113847e-08, 4.37113812e-08, -4.37113847e-08, -1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part66.BottomSurface = Enum.SurfaceType.Smooth
+Part66.TopSurface = Enum.SurfaceType.Smooth
+Part66.Position = Vector3.new(13.9099998, 24.3649979, -21.4300003)
+Part66.Color = Color3.new(1, 0, 0)
+SpecialMesh67.Parent = Part66
+SpecialMesh67.MeshType = Enum.MeshType.Wedge
+Part68.Parent = Model0
+Part68.Rotation = Vector3.new(90, 0, -90)
+Part68.Anchored = true
+Part68.CanCollide = false
+Part68.Size = Vector3.new(0.26000008, 0.15000008, 0.320000023)
+Part68.CFrame = CFrame.new(14.0749998, 23.75, -21.4300003, -1.33747976e-14, 0.99999994, 3.05979711e-07, 4.37113883e-08, 3.05979682e-07, -1, -0.99999994, 0, -4.37113847e-08)
+Part68.BottomSurface = Enum.SurfaceType.Smooth
+Part68.TopSurface = Enum.SurfaceType.Smooth
+Part68.Position = Vector3.new(14.0749998, 23.75, -21.4300003)
+Part68.Color = Color3.new(1, 0, 0)
+SpecialMesh69.Parent = Part68
+SpecialMesh69.MeshType = Enum.MeshType.Wedge
+Part70.Parent = Model0
+Part70.Rotation = Vector3.new(-90, 0, 90)
+Part70.Anchored = true
+Part70.CanCollide = false
+Part70.Size = Vector3.new(0.26000008, 0.180000097, 0.770000041)
+Part70.CFrame = CFrame.new(13.9099998, 23.8749981, -21.4300003, 9.55342711e-15, -0.99999994, -2.18556934e-07, -4.37113883e-08, -2.1855692e-07, 1, -0.99999994, 0, -4.37113847e-08)
+Part70.BottomSurface = Enum.SurfaceType.Smooth
+Part70.TopSurface = Enum.SurfaceType.Smooth
+Part70.Position = Vector3.new(13.9099998, 23.8749981, -21.4300003)
+Part70.Color = Color3.new(1, 0, 0)
+SpecialMesh71.Parent = Part70
+SpecialMesh71.MeshType = Enum.MeshType.Wedge
+Part72.Parent = Model0
+Part72.Rotation = Vector3.new(-180, 0, -68.9599991)
+Part72.Anchored = true
+Part72.CanCollide = false
+Part72.Size = Vector3.new(0.278567731, 0.100000001, 1.01999998)
+Part72.CFrame = CFrame.new(12.9866676, 22.8620491, -21, 0.358979106, 0.933345556, 0, 0.933345497, -0.358979136, 0, 0, 0, -0.99999994)
+Part72.BottomSurface = Enum.SurfaceType.Smooth
+Part72.TopSurface = Enum.SurfaceType.Smooth
+Part72.Position = Vector3.new(12.9866676, 22.8620491, -21)
+Part72.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part73.Parent = Model0
+Part73.Rotation = Vector3.new(111.040001, 90, 0)
+Part73.Anchored = true
+Part73.CanCollide = false
+Part73.Size = Vector3.new(0.278567731, 0.100000001, 2.02000022)
+Part73.CFrame = CFrame.new(14, 22.8620491, -21.5133324, 0, 0, 1, 0.933345556, -0.358979136, 0, 0.358979136, 0.933345556, 0)
+Part73.BottomSurface = Enum.SurfaceType.Smooth
+Part73.TopSurface = Enum.SurfaceType.Smooth
+Part73.Position = Vector3.new(14, 22.8620491, -21.5133324)
+Part73.Color = Color3.new(0.105882, 0.164706, 0.207843)
+WedgePart74.Parent = Model0
+WedgePart74.Rotation = Vector3.new(90, -21.039999, 0)
+WedgePart74.Anchored = true
+WedgePart74.CanCollide = false
+WedgePart74.Size = Vector3.new(0.100000001, 0.100000001, 0.278567731)
+WedgePart74.CFrame = CFrame.new(12.9866676, 22.8620491, -20.4400005, 0.933345497, 7.21807822e-08, -0.358979225, -0.358979225, 6.59041746e-08, -0.933345497, -4.37113847e-08, 0.99999994, 8.74227695e-08)
+WedgePart74.BottomSurface = Enum.SurfaceType.Smooth
+WedgePart74.Position = Vector3.new(12.9866676, 22.8620491, -20.4400005)
+WedgePart74.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part75.Parent = Model0
+Part75.Rotation = Vector3.new(90, 0, -90)
+Part75.Anchored = true
+Part75.CanCollide = false
+Part75.Size = Vector3.new(0.280000061, 0.170000091, 0.199999988)
+Part75.CFrame = CFrame.new(14.085, 24.3599987, -21.4300003, -5.73205661e-15, 0.99999994, 1.31134158e-07, 4.37113883e-08, 1.31134158e-07, -1, -0.99999994, 0, -4.37113847e-08)
+Part75.BottomSurface = Enum.SurfaceType.Smooth
+Part75.TopSurface = Enum.SurfaceType.Smooth
+Part75.Position = Vector3.new(14.085, 24.3599987, -21.4300003)
+Part75.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh76.Parent = Part75
+SpecialMesh76.MeshType = Enum.MeshType.Wedge
+Part77.Parent = Model0
+Part77.Rotation = Vector3.new(90, 0, -90)
+Part77.Anchored = true
+Part77.CanCollide = false
+Part77.Size = Vector3.new(0.240000054, 0.190000102, 0.230000004)
+Part77.CFrame = CFrame.new(14.0950003, 24.3749981, -21.4300003, -5.73205661e-15, 0.99999994, 1.31134158e-07, 4.37113883e-08, 1.31134158e-07, -1, -0.99999994, 0, -4.37113847e-08)
+Part77.BottomSurface = Enum.SurfaceType.Smooth
+Part77.TopSurface = Enum.SurfaceType.Smooth
+Part77.Position = Vector3.new(14.0950003, 24.3749981, -21.4300003)
+Part77.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh78.Parent = Part77
+SpecialMesh78.MeshType = Enum.MeshType.Wedge
+Part79.Parent = Model0
+Part79.Anchored = true
+Part79.CanCollide = false
+Part79.Size = Vector3.new(0.0900001526, 0.100000039, 1.22000003)
+Part79.CFrame = CFrame.new(12.9350004, 22.6999989, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part79.BottomSurface = Enum.SurfaceType.Smooth
+Part79.TopSurface = Enum.SurfaceType.Smooth
+Part79.Position = Vector3.new(12.9350004, 22.6999989, -21)
+Part79.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part80.Parent = Model0
+Part80.Anchored = true
+Part80.CanCollide = false
+Part80.Size = Vector3.new(0.170000061, 0.170000046, 1.06000006)
+Part80.CFrame = CFrame.new(13.5050001, 24.6549988, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part80.BottomSurface = Enum.SurfaceType.Smooth
+Part80.TopSurface = Enum.SurfaceType.Smooth
+Part80.Position = Vector3.new(13.5050001, 24.6549988, -21)
+Part80.Color = Color3.new(1, 0, 0)
+Part81.Parent = Model0
+Part81.Rotation = Vector3.new(-90, 0, -90)
+Part81.Anchored = true
+Part81.CanCollide = false
+Part81.Size = Vector3.new(0.240000054, 0.160000086, 0.170000017)
+Part81.CFrame = CFrame.new(14.0799999, 23.5049992, -21.4300003, 8.74227979e-08, 0.99999994, -3.05979711e-07, -4.37113599e-08, 3.05979682e-07, 1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part81.BottomSurface = Enum.SurfaceType.Smooth
+Part81.TopSurface = Enum.SurfaceType.Smooth
+Part81.Position = Vector3.new(14.0799999, 23.5049992, -21.4300003)
+Part81.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh82.Parent = Part81
+SpecialMesh82.MeshType = Enum.MeshType.Wedge
+Part83.Parent = Model0
+Part83.Anchored = true
+Part83.CanCollide = false
+Part83.Size = Vector3.new(0.120000005, 0.0500000007, 1.24000001)
+Part83.CFrame = CFrame.new(15.0600004, 22.6999989, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part83.BottomSurface = Enum.SurfaceType.Smooth
+Part83.TopSurface = Enum.SurfaceType.Smooth
+Part83.Position = Vector3.new(15.0600004, 22.6999989, -21)
+Part83.Color = Color3.new(1, 0, 0)
+BlockMesh84.Parent = Part83
+BlockMesh84.Scale = Vector3.new(1, 0.400000691, 1)
+BlockMesh84.Scale = Vector3.new(1, 0.400000691, 1)
+Part85.Parent = Model0
+Part85.Anchored = true
+Part85.CanCollide = false
+Part85.Size = Vector3.new(1.16000009, 0.140000015, 0.0500000007)
+Part85.CFrame = CFrame.new(14, 24.3699989, -20.4850006, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part85.BottomSurface = Enum.SurfaceType.Smooth
+Part85.TopSurface = Enum.SurfaceType.Smooth
+Part85.Position = Vector3.new(14, 24.3699989, -20.4850006)
+Part85.Color = Color3.new(1, 0, 0)
+BlockMesh86.Parent = Part85
+BlockMesh86.Scale = Vector3.new(1, 1, 0.600000381)
+BlockMesh86.Scale = Vector3.new(1, 1, 0.600000381)
+Part87.Parent = Model0
+Part87.Anchored = true
+Part87.CanCollide = false
+Part87.Size = Vector3.new(0.170000061, 0.440000027, 0.0500000007)
+Part87.CFrame = CFrame.new(13.5050001, 24.5199986, -20.4850006, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part87.BottomSurface = Enum.SurfaceType.Smooth
+Part87.TopSurface = Enum.SurfaceType.Smooth
+Part87.Position = Vector3.new(13.5050001, 24.5199986, -20.4850006)
+Part87.Color = Color3.new(1, 0, 0)
+BlockMesh88.Parent = Part87
+BlockMesh88.Scale = Vector3.new(1, 1, 0.600000381)
+BlockMesh88.Scale = Vector3.new(1, 1, 0.600000381)
+Part89.Parent = Model0
+Part89.Anchored = true
+Part89.CanCollide = false
+Part89.Size = Vector3.new(0.239999965, 0.0500000007, 1)
+Part89.CFrame = CFrame.new(14, 22.704998, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part89.BottomSurface = Enum.SurfaceType.Smooth
+Part89.TopSurface = Enum.SurfaceType.Smooth
+Part89.Position = Vector3.new(14, 22.704998, -21)
+Part89.Color = Color3.new(0.972549, 0.972549, 0.972549)
+BlockMesh90.Parent = Part89
+BlockMesh90.Scale = Vector3.new(1, 0.200000763, 1)
+BlockMesh90.Scale = Vector3.new(1, 0.200000763, 1)
+Part91.Parent = Model0
+Part91.Anchored = true
+Part91.CanCollide = false
+Part91.Size = Vector3.new(2.02000022, 0.100000039, 1.01999998)
+Part91.CFrame = CFrame.new(14, 23.0599995, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part91.BottomSurface = Enum.SurfaceType.Smooth
+Part91.TopSurface = Enum.SurfaceType.Smooth
+Part91.Position = Vector3.new(14, 23.0599995, -21)
+Part91.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part92.Parent = Model0
+Part92.Rotation = Vector3.new(-90, 0, -90)
+Part92.Anchored = true
+Part92.CanCollide = false
+Part92.Size = Vector3.new(0.200000048, 0.330000103, 0.209999993)
+Part92.CFrame = CFrame.new(14.3949995, 24.4449997, -21.4300003, 8.74227695e-08, 0.99999994, 4.37113918e-08, -4.37113883e-08, -4.37113847e-08, 1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part92.BottomSurface = Enum.SurfaceType.Smooth
+Part92.TopSurface = Enum.SurfaceType.Smooth
+Part92.Position = Vector3.new(14.3949995, 24.4449997, -21.4300003)
+Part92.Color = Color3.new(1, 0, 0)
+SpecialMesh93.Parent = Part92
+SpecialMesh93.MeshType = Enum.MeshType.Wedge
+Part94.Parent = Model0
+Part94.Rotation = Vector3.new(90, 0, 90)
+Part94.Anchored = true
+Part94.CanCollide = false
+Part94.Size = Vector3.new(0.26000008, 0.15000008, 0.320000023)
+Part94.CFrame = CFrame.new(13.9250002, 23.75, -21.4300003, -8.74227908e-08, -0.99999994, 2.18556934e-07, 4.3711367e-08, -2.1855692e-07, -1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part94.BottomSurface = Enum.SurfaceType.Smooth
+Part94.TopSurface = Enum.SurfaceType.Smooth
+Part94.Position = Vector3.new(13.9250002, 23.75, -21.4300003)
+Part94.Color = Color3.new(1, 0, 0)
+SpecialMesh95.Parent = Part94
+SpecialMesh95.MeshType = Enum.MeshType.Wedge
+WedgePart96.Parent = Model0
+WedgePart96.Rotation = Vector3.new(-180, 0, 158.959991)
+WedgePart96.Anchored = true
+WedgePart96.CanCollide = false
+WedgePart96.Size = Vector3.new(0.100000001, 0.278567731, 0.100000195)
+WedgePart96.CFrame = CFrame.new(15.0133324, 22.8620491, -20.4400005, -0.933345556, -0.358979166, 5.02127051e-08, -0.358979166, 0.933345556, 1.12978611e-07, -8.74227837e-08, 8.74227695e-08, -1)
+WedgePart96.BottomSurface = Enum.SurfaceType.Smooth
+WedgePart96.Position = Vector3.new(15.0133324, 22.8620491, -20.4400005)
+WedgePart96.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part97.Parent = Model0
+Part97.Anchored = true
+Part97.CanCollide = false
+Part97.Size = Vector3.new(0.100000001, 0.100000039, 1.22000003)
+Part97.CFrame = CFrame.new(15.0600004, 22.6999989, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part97.BottomSurface = Enum.SurfaceType.Smooth
+Part97.TopSurface = Enum.SurfaceType.Smooth
+Part97.Position = Vector3.new(15.0600004, 22.6999989, -21)
+Part97.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part98.Parent = Model0
+Part98.Anchored = true
+Part98.CanCollide = false
+Part98.Size = Vector3.new(0.170000061, 0.440000027, 0.0500000007)
+Part98.CFrame = CFrame.new(14.4949999, 24.5199986, -20.4850006, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part98.BottomSurface = Enum.SurfaceType.Smooth
+Part98.TopSurface = Enum.SurfaceType.Smooth
+Part98.Position = Vector3.new(14.4949999, 24.5199986, -20.4850006)
+Part98.Color = Color3.new(1, 0, 0)
+BlockMesh99.Parent = Part98
+BlockMesh99.Scale = Vector3.new(1, 1, 0.600000381)
+BlockMesh99.Scale = Vector3.new(1, 1, 0.600000381)
+Part100.Parent = Model0
+Part100.Rotation = Vector3.new(-90, 0, 90)
+Part100.Anchored = true
+Part100.CanCollide = false
+Part100.Size = Vector3.new(0.200000048, 0.330000103, 0.209999993)
+Part100.CFrame = CFrame.new(13.6049995, 24.4449997, -21.4300003, 1.91068547e-15, -0.99999994, -4.37113883e-08, -4.37113883e-08, -4.37113847e-08, 1, -0.99999994, 0, -4.37113847e-08)
+Part100.BottomSurface = Enum.SurfaceType.Smooth
+Part100.TopSurface = Enum.SurfaceType.Smooth
+Part100.Position = Vector3.new(13.6049995, 24.4449997, -21.4300003)
+Part100.Color = Color3.new(1, 0, 0)
+SpecialMesh101.Parent = Part100
+SpecialMesh101.MeshType = Enum.MeshType.Wedge
+Part102.Parent = Model0
+Part102.Rotation = Vector3.new(90, 0, -90)
+Part102.Anchored = true
+Part102.CanCollide = false
+Part102.Size = Vector3.new(0.220000058, 0.190000102, 0.189999998)
+Part102.CFrame = CFrame.new(13.8649998, 24.4449997, -21.4300003, -5.73205661e-15, 0.99999994, 1.31134158e-07, 4.37113883e-08, 1.31134158e-07, -1, -0.99999994, 0, -4.37113847e-08)
+Part102.BottomSurface = Enum.SurfaceType.Smooth
+Part102.TopSurface = Enum.SurfaceType.Smooth
+Part102.Position = Vector3.new(13.8649998, 24.4449997, -21.4300003)
+Part102.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh103.Parent = Part102
+SpecialMesh103.MeshType = Enum.MeshType.Wedge
+Part104.Parent = Model0
+Part104.Anchored = true
+Part104.CanCollide = false
+Part104.Size = Vector3.new(0.150000051, 0.440000027, 0.0500000007)
+Part104.CFrame = CFrame.new(13.5050001, 24.5299988, -20.4850006, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part104.BottomSurface = Enum.SurfaceType.Smooth
+Part104.TopSurface = Enum.SurfaceType.Smooth
+Part104.Position = Vector3.new(13.5050001, 24.5299988, -20.4850006)
+Part104.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part105.Parent = Model0
+Part105.Rotation = Vector3.new(-90, 0, -90)
+Part105.Anchored = true
+Part105.CanCollide = false
+Part105.Size = Vector3.new(0.240000054, 0.190000102, 0.780000031)
+Part105.CFrame = CFrame.new(14.0950003, 23.8699989, -21.4300003, 8.74227837e-08, 0.99999994, -1.31134158e-07, -4.37113741e-08, 1.31134158e-07, 1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part105.BottomSurface = Enum.SurfaceType.Smooth
+Part105.TopSurface = Enum.SurfaceType.Smooth
+Part105.Position = Vector3.new(14.0950003, 23.8699989, -21.4300003)
+Part105.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh106.Parent = Part105
+SpecialMesh106.MeshType = Enum.MeshType.Wedge
+Part107.Parent = Model0
+Part107.Rotation = Vector3.new(90, 0, -90)
+Part107.Anchored = true
+Part107.CanCollide = false
+Part107.Size = Vector3.new(0.200000048, 0.210000113, 0.209999993)
+Part107.CFrame = CFrame.new(13.875, 24.4449997, -21.4300003, -5.73205661e-15, 0.99999994, 1.31134158e-07, 4.37113883e-08, 1.31134158e-07, -1, -0.99999994, 0, -4.37113847e-08)
+Part107.BottomSurface = Enum.SurfaceType.Smooth
+Part107.TopSurface = Enum.SurfaceType.Smooth
+Part107.Position = Vector3.new(13.875, 24.4449997, -21.4300003)
+Part107.Color = Color3.new(1, 0, 0)
+SpecialMesh108.Parent = Part107
+SpecialMesh108.MeshType = Enum.MeshType.Wedge
+Part109.Parent = Model0
+Part109.Rotation = Vector3.new(-90, 0, 90)
+Part109.Anchored = true
+Part109.CanCollide = false
+Part109.Size = Vector3.new(0.280000061, 0.14000009, 0.150000021)
+Part109.CFrame = CFrame.new(13.9300003, 23.5149994, -21.4300003, 1.71961681e-14, -0.99999994, -3.93402502e-07, -4.37113883e-08, -3.93402445e-07, 1, -0.99999994, 0, -4.37113847e-08)
+Part109.BottomSurface = Enum.SurfaceType.Smooth
+Part109.TopSurface = Enum.SurfaceType.Smooth
+Part109.Position = Vector3.new(13.9300003, 23.5149994, -21.4300003)
+Part109.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh110.Parent = Part109
+SpecialMesh110.MeshType = Enum.MeshType.Wedge
+Part111.Parent = Model0
+Part111.Rotation = Vector3.new(90, 0, -90)
+Part111.Anchored = true
+Part111.CanCollide = false
+Part111.Size = Vector3.new(0.280000061, 0.14000009, 0.310000032)
+Part111.CFrame = CFrame.new(14.0699997, 23.7449989, -21.4300003, -1.33747976e-14, 0.99999994, 3.05979711e-07, 4.37113883e-08, 3.05979682e-07, -1, -0.99999994, 0, -4.37113847e-08)
+Part111.BottomSurface = Enum.SurfaceType.Smooth
+Part111.TopSurface = Enum.SurfaceType.Smooth
+Part111.Position = Vector3.new(14.0699997, 23.7449989, -21.4300003)
+Part111.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh112.Parent = Part111
+SpecialMesh112.MeshType = Enum.MeshType.Wedge
+Part113.Parent = Model0
+Part113.Rotation = Vector3.new(90, 0, 90)
+Part113.Anchored = true
+Part113.CanCollide = false
+Part113.Size = Vector3.new(0.280000061, 0.14000009, 0.310000032)
+Part113.CFrame = CFrame.new(13.9300003, 23.7449989, -21.4300003, -8.74227908e-08, -0.99999994, 2.18556934e-07, 4.3711367e-08, -2.1855692e-07, -1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part113.BottomSurface = Enum.SurfaceType.Smooth
+Part113.TopSurface = Enum.SurfaceType.Smooth
+Part113.Position = Vector3.new(13.9300003, 23.7449989, -21.4300003)
+Part113.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh114.Parent = Part113
+SpecialMesh114.MeshType = Enum.MeshType.Wedge
+Part115.Parent = Model0
+Part115.Rotation = Vector3.new(-90, 0, -90)
+Part115.Anchored = true
+Part115.CanCollide = false
+Part115.Size = Vector3.new(0.280000061, 0.14000009, 0.150000021)
+Part115.CFrame = CFrame.new(14.0699997, 23.5149994, -21.4300003, 8.74227979e-08, 0.99999994, -3.05979711e-07, -4.37113599e-08, 3.05979682e-07, 1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part115.BottomSurface = Enum.SurfaceType.Smooth
+Part115.TopSurface = Enum.SurfaceType.Smooth
+Part115.Position = Vector3.new(14.0699997, 23.5149994, -21.4300003)
+Part115.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh116.Parent = Part115
+SpecialMesh116.MeshType = Enum.MeshType.Wedge
+WedgePart117.Parent = Model0
+WedgePart117.Rotation = Vector3.new(111.040001, 0, 90)
+WedgePart117.Anchored = true
+WedgePart117.CanCollide = false
+WedgePart117.Size = Vector3.new(0.100000001, 0.100000001, 0.278567731)
+WedgePart117.CFrame = CFrame.new(12.9399996, 22.8620491, -21.5133324, 4.37113847e-08, -0.99999994, -8.74227695e-08, -0.358979225, 6.59041746e-08, -0.933345497, 0.933345497, 7.21807822e-08, -0.358979225)
+WedgePart117.BottomSurface = Enum.SurfaceType.Smooth
+WedgePart117.Position = Vector3.new(12.9399996, 22.8620491, -21.5133324)
+WedgePart117.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part118.Parent = Model0
+Part118.Anchored = true
+Part118.CanCollide = false
+Part118.Size = Vector3.new(0.600000083, 0.390000045, 1.01999998)
+Part118.CFrame = CFrame.new(14.71, 24.5249996, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part118.BottomSurface = Enum.SurfaceType.Smooth
+Part118.TopSurface = Enum.SurfaceType.Smooth
+Part118.Position = Vector3.new(14.71, 24.5249996, -21)
+Part118.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part119.Parent = Model0
+Part119.Rotation = Vector3.new(90, 0, 90)
+Part119.Anchored = true
+Part119.CanCollide = false
+Part119.Size = Vector3.new(0.280000061, 0.170000091, 0.199999988)
+Part119.CFrame = CFrame.new(13.915, 24.3599987, -21.4300003, -8.74227766e-08, -0.99999994, 4.37113847e-08, 4.37113812e-08, -4.37113847e-08, -1, 0.99999994, -8.74227695e-08, 4.37113812e-08)
+Part119.BottomSurface = Enum.SurfaceType.Smooth
+Part119.TopSurface = Enum.SurfaceType.Smooth
+Part119.Position = Vector3.new(13.915, 24.3599987, -21.4300003)
+Part119.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh120.Parent = Part119
+SpecialMesh120.MeshType = Enum.MeshType.Wedge
+Part121.Parent = Model0
+Part121.Anchored = true
+Part121.CanCollide = false
+Part121.Size = Vector3.new(0.190000057, 0.170000046, 1.04000008)
+Part121.CFrame = CFrame.new(13.5050001, 24.6449986, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part121.BottomSurface = Enum.SurfaceType.Smooth
+Part121.TopSurface = Enum.SurfaceType.Smooth
+Part121.Position = Vector3.new(13.5050001, 24.6449986, -21)
+Part121.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+Part122.Parent = Model0
+Part122.Rotation = Vector3.new(90, 0, -90)
+Part122.Anchored = true
+Part122.CanCollide = false
+Part122.Size = Vector3.new(0.180000052, 0.230000094, 0.230000004)
+Part122.CFrame = CFrame.new(13.8850002, 24.4449997, -21.4300003, -5.73205661e-15, 0.99999994, 1.31134158e-07, 4.37113883e-08, 1.31134158e-07, -1, -0.99999994, 0, -4.37113847e-08)
+Part122.BottomSurface = Enum.SurfaceType.Smooth
+Part122.TopSurface = Enum.SurfaceType.Smooth
+Part122.Position = Vector3.new(13.8850002, 24.4449997, -21.4300003)
+Part122.Color = Color3.new(0.0666667, 0.0666667, 0.0666667)
+SpecialMesh123.Parent = Part122
+SpecialMesh123.MeshType = Enum.MeshType.Wedge
+Part124.Parent = Model0
+Part124.Anchored = true
+Part124.CanCollide = false
+Part124.Size = Vector3.new(2.02000022, 0.870000005, 1.01999998)
+Part124.CFrame = CFrame.new(14, 23.8949986, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part124.BottomSurface = Enum.SurfaceType.Smooth
+Part124.TopSurface = Enum.SurfaceType.Smooth
+Part124.Position = Vector3.new(14, 23.8949986, -21)
+Part124.Color = Color3.new(0.105882, 0.164706, 0.207843)
+weld(Model0)
+newWeld(torso,Model0.asd,0,0,0)
+
+Model0 = Instance.new("Model")
+Part1 = Instance.new("Part")
+Part2 = Instance.new("Part")
+Part3 = Instance.new("Part")
+Part4 = Instance.new("Part")
+Part5 = Instance.new("Part")
+Model0.Parent = char
+Part1.Name = "asd"
+Part1.Parent = Model0
+Part1.Transparency = 1
+Part1.Anchored = true
+Part1.CanCollide = false
+Part1.Size = Vector3.new(1, 2, 1)
+Part1.CFrame = CFrame.new(-42.0999985, 23.5749989, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part1.BottomSurface = Enum.SurfaceType.Smooth
+Part1.TopSurface = Enum.SurfaceType.Smooth
+Part1.Position = Vector3.new(-42.0999985, 23.5749989, -21)
+Part1.Color = Color3.new(0.972549, 0.972549, 0.972549)
+Part2.Parent = Model0
+Part2.Anchored = true
+Part2.CanCollide = false
+Part2.Size = Vector3.new(1.01999998, 0.28000012, 1.01999998)
+Part2.CFrame = CFrame.new(-42.0999985, 22.7049999, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part2.BottomSurface = Enum.SurfaceType.Smooth
+Part2.TopSurface = Enum.SurfaceType.Smooth
+Part2.Position = Vector3.new(-42.0999985, 22.7049999, -21)
+Part2.Color = Color3.new(0.423529, 0.345098, 0.294118)
+Part3.Parent = Model0
+Part3.Anchored = true
+Part3.CanCollide = false
+Part3.Size = Vector3.new(1.01999998, 0.320000112, 0.180000022)
+Part3.CFrame = CFrame.new(-42.0999985, 22.6849995, -20.5799999, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part3.BottomSurface = Enum.SurfaceType.Smooth
+Part3.TopSurface = Enum.SurfaceType.Smooth
+Part3.Position = Vector3.new(-42.0999985, 22.6849995, -20.5799999)
+Part3.Color = Color3.new(0.423529, 0.345098, 0.294118)
+Part4.Parent = Model0
+Part4.Anchored = true
+Part4.CanCollide = false
+Part4.Size = Vector3.new(1.01999998, 0.320000112, 0.629999995)
+Part4.CFrame = CFrame.new(-42.0999985, 22.6849995, -21.1949997, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part4.BottomSurface = Enum.SurfaceType.Smooth
+Part4.TopSurface = Enum.SurfaceType.Smooth
+Part4.Position = Vector3.new(-42.0999985, 22.6849995, -21.1949997)
+Part4.Color = Color3.new(0.423529, 0.345098, 0.294118)
+Part5.Parent = Model0
+Part5.Anchored = true
+Part5.CanCollide = false
+Part5.Size = Vector3.new(1.03999996, 0.51000005, 1.03999996)
+Part5.CFrame = CFrame.new(-42.0999985, 23.0899982, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part5.BottomSurface = Enum.SurfaceType.Smooth
+Part5.TopSurface = Enum.SurfaceType.Smooth
+Part5.Position = Vector3.new(-42.0999985, 23.0899982, -21)
+Part5.Color = Color3.new(0.972549, 0.972549, 0.972549)
+weld(Model0)
+Model1 = Model0:Clone()
+Model1.Parent = char
+newWeld(lleg,Model0.asd,0,0,0)
+newWeld(rleg,Model1.asd,0,0,0)
+
+Model0 = Instance.new("Model")
+Part1 = Instance.new("Part")
+SpecialMesh2 = Instance.new("SpecialMesh")
+Part3 = Instance.new("Part")
+Part4 = Instance.new("Part")
+Part5 = Instance.new("Part")
+BlockMesh6 = Instance.new("BlockMesh")
+Part7 = Instance.new("Part")
+BlockMesh8 = Instance.new("BlockMesh")
+Part9 = Instance.new("Part")
+Part10 = Instance.new("Part")
+SpecialMesh11 = Instance.new("SpecialMesh")
+Part12 = Instance.new("Part")
+SpecialMesh13 = Instance.new("SpecialMesh")
+Part14 = Instance.new("Part")
+Part15 = Instance.new("Part")
+BlockMesh16 = Instance.new("BlockMesh")
+Part17 = Instance.new("Part")
+SpecialMesh18 = Instance.new("SpecialMesh")
+Part19 = Instance.new("Part")
+Model0.Parent = char
+Part1.Parent = Model0
+Part1.Anchored = true
+Part1.CanCollide = false
+Part1.Size = Vector3.new(0.0500000007, 0.230000004, 0.239999995)
+Part1.CFrame = CFrame.new(-16.0599995, 23.1539993, -21.1100006, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part1.BottomSurface = Enum.SurfaceType.Smooth
+Part1.TopSurface = Enum.SurfaceType.Smooth
+Part1.Position = Vector3.new(-16.0599995, 23.1539993, -21.1100006)
+Part1.Color = Color3.new(0.423529, 0.345098, 0.294118)
+SpecialMesh2.Parent = Part1
+SpecialMesh2.Scale = Vector3.new(0.600000739, 1, 1)
+SpecialMesh2.MeshType = Enum.MeshType.Cylinder
+SpecialMesh2.Scale = Vector3.new(0.600000739, 1, 1)
+Part3.Parent = Model0
+Part3.Anchored = true
+Part3.CanCollide = false
+Part3.Size = Vector3.new(0.580000103, 0.25, 1.01999998)
+Part3.CFrame = CFrame.new(-15.7650003, 22.914999, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part3.BottomSurface = Enum.SurfaceType.Smooth
+Part3.TopSurface = Enum.SurfaceType.Smooth
+Part3.Position = Vector3.new(-15.7650003, 22.914999, -21)
+Part3.Color = Color3.new(0.423529, 0.345098, 0.294118)
+Part4.Name = "asd"
+Part4.Parent = Model0
+Part4.Transparency = 1
+Part4.Anchored = true
+Part4.CanCollide = false
+Part4.Size = Vector3.new(1, 2, 1)
+Part4.CFrame = CFrame.new(-15.5450001, 23.7999992, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part4.BottomSurface = Enum.SurfaceType.Smooth
+Part4.TopSurface = Enum.SurfaceType.Smooth
+Part4.Position = Vector3.new(-15.5450001, 23.7999992, -21)
+Part4.Color = Color3.new(1, 0.8, 0.6)
+Part5.Parent = Model0
+Part5.Anchored = true
+Part5.CanCollide = false
+Part5.Size = Vector3.new(1.0200001, 0.0500000007, 1.01999998)
+Part5.CFrame = CFrame.new(-15.5450001, 23.6299992, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part5.BottomSurface = Enum.SurfaceType.Smooth
+Part5.TopSurface = Enum.SurfaceType.Smooth
+Part5.Position = Vector3.new(-15.5450001, 23.6299992, -21)
+Part5.Color = Color3.new(0.972549, 0.972549, 0.972549)
+BlockMesh6.Parent = Part5
+BlockMesh6.Scale = Vector3.new(1, 0.800000191, 1)
+BlockMesh6.Scale = Vector3.new(1, 0.800000191, 1)
+Part7.Parent = Model0
+Part7.Anchored = true
+Part7.CanCollide = false
+Part7.Size = Vector3.new(1.0200001, 0.0500000007, 1.01999998)
+Part7.CFrame = CFrame.new(-15.5450001, 23.5799999, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part7.BottomSurface = Enum.SurfaceType.Smooth
+Part7.TopSurface = Enum.SurfaceType.Smooth
+Part7.Position = Vector3.new(-15.5450001, 23.5799999, -21)
+Part7.Color = Color3.new(0.972549, 0.972549, 0.972549)
+BlockMesh8.Parent = Part7
+BlockMesh8.Scale = Vector3.new(1, 0.800000191, 1)
+BlockMesh8.Scale = Vector3.new(1, 0.800000191, 1)
+Part9.Parent = Model0
+Part9.Anchored = true
+Part9.CanCollide = false
+Part9.Size = Vector3.new(1.04000008, 0.290000021, 1.03999996)
+Part9.CFrame = CFrame.new(-15.5450001, 24.0049992, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part9.BottomSurface = Enum.SurfaceType.Smooth
+Part9.TopSurface = Enum.SurfaceType.Smooth
+Part9.Position = Vector3.new(-15.5450001, 24.0049992, -21)
+Part9.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part10.Parent = Model0
+Part10.Anchored = true
+Part10.CanCollide = false
+Part10.Size = Vector3.new(0.0500000007, 0.230000004, 0.239999995)
+Part10.CFrame = CFrame.new(-16.0599995, 23.1759987, -20.8899994, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part10.BottomSurface = Enum.SurfaceType.Smooth
+Part10.TopSurface = Enum.SurfaceType.Smooth
+Part10.Position = Vector3.new(-16.0599995, 23.1759987, -20.8899994)
+Part10.Color = Color3.new(0.423529, 0.345098, 0.294118)
+SpecialMesh11.Parent = Part10
+SpecialMesh11.Scale = Vector3.new(0.600000739, 1, 1)
+SpecialMesh11.MeshType = Enum.MeshType.Cylinder
+SpecialMesh11.Scale = Vector3.new(0.600000739, 1, 1)
+Part12.Parent = Model0
+Part12.Material = Enum.Material.Neon
+Part12.Anchored = true
+Part12.CanCollide = false
+Part12.Size = Vector3.new(0.0500000007, 0.25, 0.25999999)
+Part12.CFrame = CFrame.new(-16.0599995, 23.164999, -21.1100006, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part12.BottomSurface = Enum.SurfaceType.Smooth
+Part12.TopSurface = Enum.SurfaceType.Smooth
+Part12.Position = Vector3.new(-16.0599995, 23.164999, -21.1100006)
+Part12.Color = Color3.new(0, 1, 0)
+SpecialMesh13.Parent = Part12
+SpecialMesh13.Scale = Vector3.new(0.200000763, 1, 1)
+SpecialMesh13.MeshType = Enum.MeshType.Cylinder
+SpecialMesh13.Scale = Vector3.new(0.200000763, 1, 1)
+Part14.Parent = Model0
+Part14.Anchored = true
+Part14.CanCollide = false
+Part14.Size = Vector3.new(1.0200001, 0.949999988, 1.01999998)
+Part14.CFrame = CFrame.new(-15.5450001, 24.3349991, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part14.BottomSurface = Enum.SurfaceType.Smooth
+Part14.TopSurface = Enum.SurfaceType.Smooth
+Part14.Position = Vector3.new(-15.5450001, 24.3349991, -21)
+Part14.Color = Color3.new(0.105882, 0.164706, 0.207843)
+Part15.Parent = Model0
+Part15.Rotation = Vector3.new(1, 90, 0)
+Part15.Anchored = true
+Part15.CanCollide = false
+Part15.Size = Vector3.new(1.0200001, 0.0500000007, 1.01999998)
+Part15.CFrame = CFrame.new(-15.5450001, 23.6049995, -21, -4.37047305e-08, 7.62864549e-10, 1, 0.0174523052, 0.999847651, 0, -0.99984771, 0.017452307, -4.37113883e-08)
+Part15.BottomSurface = Enum.SurfaceType.Smooth
+Part15.TopSurface = Enum.SurfaceType.Smooth
+Part15.Position = Vector3.new(-15.5450001, 23.6049995, -21)
+Part15.Color = Color3.new(0.972549, 0.972549, 0.972549)
+BlockMesh16.Parent = Part15
+BlockMesh16.Scale = Vector3.new(1, 0.200000167, 1)
+BlockMesh16.Scale = Vector3.new(1, 0.200000167, 1)
+Part17.Parent = Model0
+Part17.Material = Enum.Material.Neon
+Part17.Anchored = true
+Part17.CanCollide = false
+Part17.Size = Vector3.new(0.0500000007, 0.25, 0.25999999)
+Part17.CFrame = CFrame.new(-16.0599995, 23.164999, -20.8899994, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part17.BottomSurface = Enum.SurfaceType.Smooth
+Part17.TopSurface = Enum.SurfaceType.Smooth
+Part17.Position = Vector3.new(-16.0599995, 23.164999, -20.8899994)
+Part17.Color = Color3.new(0, 1, 0)
+SpecialMesh18.Parent = Part17
+SpecialMesh18.Scale = Vector3.new(0.200000763, 1, 1)
+SpecialMesh18.MeshType = Enum.MeshType.Cylinder
+SpecialMesh18.Scale = Vector3.new(0.200000763, 1, 1)
+Part19.Parent = Model0
+Part19.Anchored = true
+Part19.CanCollide = false
+Part19.Size = Vector3.new(1.0200001, 0.519999981, 1.01999998)
+Part19.CFrame = CFrame.new(-15.5450001, 23.2999992, -21, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+Part19.BottomSurface = Enum.SurfaceType.Smooth
+Part19.TopSurface = Enum.SurfaceType.Smooth
+Part19.Position = Vector3.new(-15.5450001, 23.2999992, -21)
+Part19.Color = Color3.new(0.423529, 0.345098, 0.294118)
+weld(Model0)
+Model1 = Model0:Clone()
+Model1.Parent = char
+newWeld(larm,Model0.asd,0,0,0)
+newWeld(rarm,Model1.asd,0,0,0)
+Model1.asd.Weld.C1 = CFrame.Angles(0,math.rad(180),0)
+
+----------------------------------------------------------------------------
+leftwpn = {}
+rightwpn = {}
+lmidwpn = nil
+rmidwpn = nil
+for z=1,2 do
+local target = larm
+if z == 1 then target = rarm end
+for i=-1,1 do
+local part = Instance.new("Part",char)
+local mesh = Instance.new("SpecialMesh",part)
+mesh.MeshId = "rbxassetid://441574777"
+mesh.TextureId = "rbxassetid://441574805"
+mesh.Scale = Vector3.new(1,1,1)*0.015
+part.CanCollide = false
+part.Size = Vector3.new(0.2,3,0.3)
+newWeld(target,part,0,-1.5,-i*0.5)
+part.Weld.C1 = CFrame.new(0,-0.6,0.2)*CFrame.Angles(math.rad(-150+i*20),math.rad(180),math.rad(0))
+if z == 1 then table.insert(rightwpn,part) if i == 0 then rmidwpn = part end else table.insert(leftwpn,part) if i == 0 then lmidwpn = part end end
+end
+end
+
+local size = 1
+
+newWeld(torso, larm, -1.5*size, 0.5*size, 0)
+larm.Weld.C1 = CFrame.new(0, 0.5*size, 0)
+newWeld(torso, rarm, 1.5*size, 0.5*size, 0)
+rarm.Weld.C1 = CFrame.new(0, 0.5*size, 0)
+newWeld(torso, hed, 0, 1.5*size, 0)
+newWeld(torso, lleg, -0.5*size, -1, 0)
+lleg.Weld.C1 = CFrame.new(0, 1*size, 0)
+newWeld(torso, rleg, 0.5*size, -1*size, 0)
+rleg.Weld.C1 = CFrame.new(0, 1*size, 0)
+newWeld(root, torso, 0, -1*size, 0)
+torso.Weld.C1 = CFrame.new(0, -1*size, 0)
+
+----------------------------------------------------------------------------------------
+combocounter = 0
+combotimer = 0
+texttimer = 0
+gui = Instance.new("ScreenGui",plr.PlayerGui)
+
+chattext = Instance.new("TextLabel",gui)
+chattext.Size = UDim2.new(1,0,0,40)
+chattext.AnchorPoint = Vector2.new(0.5,1)
+chattext.Position = UDim2.new(0.5,0,1,-100)
+chattext.TextXAlignment = Enum.TextXAlignment.Center
+chattext.BackgroundTransparency = 0.35
+chattext.BackgroundColor3 = Color3.fromHSV(0,0,0)
+chattext.Font = Enum.Font.Cartoon
+chattext.FontSize = Enum.FontSize.Size28
+chattext.TextColor3 = Color3.new(1,1,1)
+chattext.TextStrokeTransparency = 0
+chattext.BorderSizePixel = 0
+
+combotext = Instance.new("TextLabel",gui)
+combotext.Size = UDim2.new(1,0,0,80)
+combotext.AnchorPoint = Vector2.new(1,1)
+combotext.Position = UDim2.new(1,-40,1,-240)
+combotext.TextXAlignment = Enum.TextXAlignment.Right
+combotext.BackgroundTransparency = 1
+combotext.BackgroundColor3 = Color3.fromHSV(0,0,0)
+combotext.Font = Enum.Font.Cartoon
+combotext.FontSize = 8
+combotext.TextColor3 = Color3.new(0,0,0)
+combotext.TextStrokeTransparency = 0
+combotext.BorderSizePixel = 0
+
+combotimervis = Instance.new("Frame",combotext)
+combotimervis.Size = UDim2.new(0,0,0,4)
+combotimervis.AnchorPoint = Vector2.new(1,0)
+combotimervis.Position = UDim2.new(1,0,1,0)
+combotimervis.BorderColor3 = Color3.new(0,0,0)
+
+rs:connect(function()
+local asdf = -0.1
+if -(combocounter/1000) > -0.1 then asdf = -(combocounter/1000) end
+if combocounter > 0 then
+combotext.TextColor3 = Color3.fromHSV(0.1+asdf,1,1)
+else
+combotext.TextColor3 = Color3.fromHSV(0,0,0)
+end
+combotimervis.BackgroundColor3 = combotext.TextColor3
+combotimervis.Size = UDim2.new(0,combotimer/2,0,4)
+combotext.Text = combocounter.."x"
+if combotimer > 0 then
+combotimer = combotimer - 1
+else
+combocounter = 0
+end
+if texttimer > 0 then
+texttimer = texttimer - 1
+chattext.BackgroundTransparency = 0.35
+else
+chattext.Text = ""
+chattext.BackgroundTransparency = 1
+end
+end)
+
+function damage(model,dmg)
+local hum = model:FindFirstChildOfClass("Humanoid")
+local torson = model:FindFirstChild("Torso") or model:FindFirstChild("UpperTorso")
+hum:TakeDamage(hum.MaxHealth/dmg)
+combotimer = 60*5
+combocounter = combocounter + 1
+if combocounter == 100 or combocounter == 200 or combocounter == 300 or combocounter == 400 or combocounter == 500 or  combocounter == 600 or combocounter == 700 or combocounter == 800 or combocounter == 900 or combocounter == 1000 then
+combosfx[combocounter/100]:Play() 
+texttimer = math.ceil(60*combosfx[combocounter/100].TimeLength)+30
+if combocounter == 500 then
+chattext.Text = combocounter.." hit combo! That's nowhere near enough!"
+elseif combocounter == 1000 then
+chattext.Text = "1,000 hit combo! That's what I'm talking about!"
+else
+chattext.Text = combocounter.." hit combo!"
+end
+print(texttimer)
+end
+if torson:FindFirstChildOfClass("BodyPosition") then
+torson:FindFirstChildOfClass("BodyPosition"):Destroy()
+end
+if hum.Health > 0 then
+local bp = Instance.new("BodyPosition",torson)
+bp.MaxForce = Vector3.new(1,1,1)*9e9
+bp.P = 10000
+bp.D = 500
+bp.Position = root.Position+(root.CFrame.lookVector*4)
+local loop = rs:connect(function()
+bp.Position = root.Position+(root.CFrame.lookVector*4)
+end)
+delay(0.5,function() coroutine.resume(coroutine.create(function() bp:Destroy() end)) loop:disconnect() end)
+end
+end
+
+function attackone()
+local spd = 0.25
+for i=1,10 do rs:wait()
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0,1.5,-.1)     *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.new(0,0,0)         *CFrame.Angles(math.rad(10),math.rad(-40),math.rad(0)), spd)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1.5,0.55,0) *CFrame.Angles(math.rad(90),math.rad(0),math.rad(0)), spd)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5,0.55,0)  *CFrame.Angles(math.rad(120),math.rad(0),math.rad(40)), spd)
+torso.Weld.C0 = Lerp(torso.Weld.C0, CFrame.new(0, -1, 0)  *CFrame.Angles(math.rad(10),math.rad(-40),math.rad(0)), spd)
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,-0.95,0)*CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,-0.95,0) *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+end
+if jumped == true then
+root.Velocity = Vector3.new(0,50,0)+(root.CFrame.lookVector*20)
+else
+root.Velocity = Vector3.new(0,0,0)+(root.CFrame.lookVector*120)
+end
+local alreadytouched = {}
+local randomiser = math.random(1,2)
+local spd = 0.5
+for i=1,10 do rs:wait()
+
+local v = rmidwpn
+local asd = Vector3.new(math.random(-10000,10000)/10000,math.random(-10000,10000)/10000,math.random(-10000,10000)/10000)
+local effekt = Effect(Enum.MeshType.Brick,Vector3.new(1,1,1)*(2+(math.random(-10000,10000)/10000*0.2)),0,Enum.Material.Neon,Color3.fromHSV(math.random(10,100)/1000,1,1),v.Position,v.Orientation,Vector3.new(0,0,0),Vector3.new(-0.2,-0.2,0.2),Vector3.new(),0,0)
+
+for i,x in pairs(findAllNearestTorso(v.Position,8)) do
+local hitting = true
+for i,z in pairs(alreadytouched) do if x == z then hitting = false end end
+if hitting == true then
+damage(x.Parent,math.random(0,0))
+table.insert(alreadytouched,x)
+end
+end
+
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0,1.5,-.1)     *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.new(0,0,0)         *CFrame.Angles(math.rad(-10),math.rad(50),math.rad(0)), spd)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1.5,0.55,0) *CFrame.Angles(math.rad(-20),math.rad(0),math.rad(0)), spd)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5,0.55,0)  *CFrame.Angles(math.rad(40),math.rad(0),math.rad(0)), spd)
+if randomiser == 1 then
+torso.Weld.C0 = Lerp(torso.Weld.C0, CFrame.new(0, -1, 0)  *CFrame.Angles(math.rad(-10),math.rad(50),math.rad(0)), spd)
+elseif randomiser == 2 then
+torso.Weld.C0 = CFrame.new(0, -1, 0)  *CFrame.Angles(0,math.rad((i/10)*360),0)
+end
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,-0.5,-0.5)*CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,-0.95,0) *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+effekt.CFrame = CFrame.new(effekt.Position,rmidwpn.Position)
+end
+end
+
+function attacktwo()
+local spd = 0.25
+for i=1,10 do rs:wait()
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0,1.5,-.1)     *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.new(0,0,0)         *CFrame.Angles(math.rad(10),math.rad(40),math.rad(0)), spd)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1.5,0.55,0) *CFrame.Angles(math.rad(120),math.rad(0),math.rad(-40)), spd)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5,0.55,0)  *CFrame.Angles(math.rad(90),math.rad(0),math.rad(0)), spd)
+torso.Weld.C0 = Lerp(torso.Weld.C0, CFrame.new(0, -1, 0)  *CFrame.Angles(math.rad(10),math.rad(40),math.rad(0)), spd)
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,-0.95,0)*CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,-0.95,0) *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+end
+if jumped == true then
+root.Velocity = Vector3.new(0,50,0)+(root.CFrame.lookVector*20)
+else
+root.Velocity = Vector3.new(0,0,0)+(root.CFrame.lookVector*120)
+end
+local alreadytouched = {}
+local randomiser = math.random(1,2)
+local spd = 0.5
+for i=1,10 do rs:wait()
+
+local v = lmidwpn
+local asd = Vector3.new(math.random(-10000,10000)/10000,math.random(-10000,10000)/10000,math.random(-10000,10000)/10000)
+local effekt = Effect(Enum.MeshType.Brick,Vector3.new(1,1,1)*(2+(math.random(-10000,10000)/10000*0.2)),0,Enum.Material.Neon,Color3.fromHSV(math.random(10,100)/1000,1,1),v.Position,v.Orientation,Vector3.new(0,0,0),Vector3.new(-0.2,-0.2,0.2),Vector3.new(),0,0)
+
+for i,x in pairs(findAllNearestTorso(v.Position,8)) do
+local hitting = true
+for i,z in pairs(alreadytouched) do if x == z then hitting = false end end
+if hitting == true then
+damage(x.Parent,math.random(0,0))
+table.insert(alreadytouched,x)
+end
+end
+
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0,1.5,-.1)     *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.new(0,0,0)         *CFrame.Angles(math.rad(-10),math.rad(-50),math.rad(0)), spd)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1.5,0.55,0) *CFrame.Angles(math.rad(40),math.rad(0),math.rad(0)), spd)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5,0.55,0)  *CFrame.Angles(math.rad(-20),math.rad(0),math.rad(0)), spd)
+if randomiser == 1 then
+torso.Weld.C0 = Lerp(torso.Weld.C0, CFrame.new(0, -1, 0)  *CFrame.Angles(math.rad(-10),math.rad(-50),math.rad(0)), spd)
+elseif randomiser == 2 then
+torso.Weld.C0 = CFrame.new(0, -1, 0)  *CFrame.Angles(0,math.rad(-(i/10)*360),0)
+end
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,-0.95,0)*CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,-0.5,-0.5) *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+effekt.CFrame = CFrame.new(effekt.Position,lmidwpn.Position)
+end
+end
+
+function attackthree(uhidk)
+local spd = 0.15
+for i=1,15 do rs:wait()
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0,1.5,-.1)     *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.new(0,0,0)         *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-0.5,0.55,-0.2) *CFrame.Angles(math.rad(160),math.rad(0),math.rad(20)), spd)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(0.5,0.55,-0.2)  *CFrame.Angles(math.rad(160),math.rad(0),math.rad(-20)), spd)
+torso.Weld.C0 = Lerp(torso.Weld.C0, CFrame.new(0, -1, 0)  *CFrame.Angles(math.rad(-10),math.rad(0),math.rad(0)), spd)
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,-0.5,-0.5)*CFrame.Angles(math.rad(-40),math.rad(0),math.rad(0)), spd)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,-0.5,-0.5) *CFrame.Angles(math.rad(-40),math.rad(0),math.rad(0)), spd)
+end
+if jumped == true then
+root.Velocity = Vector3.new(0,40,0)+(root.CFrame.lookVector*10)
+else
+root.Velocity = Vector3.new(0,0,0)+(root.CFrame.lookVector*80)
+end
+local alreadytouched = {}
+if uhidk == true then
+Effect(Enum.MeshType.Sphere,Vector3.new(1,1,1)*5,0,Enum.Material.Neon,Color3.new(0,1,0),torso.Position,Vector3.new(),Vector3.new(),Vector3.new(0.2,0.2,0.2),Vector3.new(),0.05,0.05)
+Effect(Enum.MeshType.Sphere,Vector3.new(1,1,1)*5,0,Enum.Material.Neon,Color3.new(0.5,1,0),torso.Position,Vector3.new(),Vector3.new(),Vector3.new(0.3,0.3,0.3),Vector3.new(),0.05,0.1)
+sound(260433768,torso.Position,2,math.random(100,120)/100)
+
+for i,x in pairs(findAllNearestTorso(root.Position,10)) do
+damage(x.Parent,math.random(0,0))
+end
+
+end
+
+local spd = 0.4
+for i=1,6 do rs:wait()
+local effekt = nil
+local effect2 = nil
+if uhidk == false then
+
+local v = rmidwpn
+local asd = Vector3.new(math.random(-10000,10000)/10000,math.random(-10000,10000)/10000,math.random(-10000,10000)/10000)
+effekt = Effect(Enum.MeshType.Brick,Vector3.new(1,1,1)*(2+(math.random(-10000,10000)/10000*0.2)),0,Enum.Material.Neon,Color3.fromHSV(math.random(10,100)/1000,1,1),v.Position,v.Orientation,Vector3.new(0,0,0),Vector3.new(-0.2,-0.2,0.2),Vector3.new(),0,0)
+
+for i,x in pairs(findAllNearestTorso(v.Position,8)) do
+local hitting = true
+for i,z in pairs(alreadytouched) do if x == z then hitting = false end end
+if hitting == true then
+damage(x.Parent,math.random(0,0))
+table.insert(alreadytouched,x)
+end
+end
+
+local v = lmidwpn
+local asd = Vector3.new(math.random(-10000,10000)/10000,math.random(-10000,10000)/10000,math.random(-10000,10000)/10000)
+effekt2 = Effect(Enum.MeshType.Brick,Vector3.new(1,1,1)*(2+(math.random(-10000,10000)/10000*0.2)),0,Enum.Material.Neon,Color3.fromHSV(math.random(10,100)/1000,1,1),v.Position,v.Orientation,Vector3.new(0,0,0),Vector3.new(-0.2,-0.2,0.2),Vector3.new(),0,0)
+
+for i,x in pairs(findAllNearestTorso(v.Position,8)) do
+local hitting = true
+for i,z in pairs(alreadytouched) do if x == z then hitting = false end end
+if hitting == true then
+damage(x.Parent,math.random(0,0))
+table.insert(alreadytouched,x)
+end
+end
+
+end
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0,1.5,-.1)     *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.new(0,0,0)         *CFrame.Angles(math.rad(10),math.rad(0),math.rad(0)), spd)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1.5,0.55,0) *CFrame.Angles(math.rad(-10),math.rad(0),math.rad(-50)), spd)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5,0.55,0)  *CFrame.Angles(math.rad(-10),math.rad(0),math.rad(50)), spd)
+torso.Weld.C0 = Lerp(torso.Weld.C0, CFrame.new(0, -1, 0)  *CFrame.Angles(math.rad(10),math.rad(0),math.rad(0)), spd)
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,-0.95,0)*CFrame.Angles(math.rad(-20),math.rad(0),math.rad(-30)), spd)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,-0.95,0) *CFrame.Angles(math.rad(-20),math.rad(0),math.rad(30)), spd)
+if uhidk == false then
+effekt.CFrame = CFrame.new(effekt.Position,rmidwpn.Position) 
+effekt2.CFrame = CFrame.new(effekt2.Position,lmidwpn.Position)
+end
+end
+end
+
+local combo = 1
+local combo2 = 2
+local timer = 0
+local debounce = false
+local idk = false
+mouse.Button1Down:connect(function()
+if debounce == false and idk == false then
+timer = 40
+noidle = true
+freeze = true
+debounce = true
+if combo == 1 then
+if combo2 == 1 then attackone() else attacktwo() end
+combo = 2
+elseif combo == 2 then
+if combo2 == 2 then attackone() else attacktwo() end
+combo = 3
+elseif combo == 3 then
+if combo2 == 1 then combo2 = 2 else combo2 = 1 end
+attackthree(false)
+combo = 1
+end
+noidle = false
+freeze = false
+debounce = false
+end
+end)
+
+function spintf(power)
+local spd = 0.4
+local asdf = 0
+for i=1,power do rs:wait()
+root.Velocity = (root.CFrame.lookVector*(power*10))
+local asd = Vector3.new(math.random(-10000,10000)/10000,math.random(-10000,10000)/10000,math.random(-10000,10000)/10000)
+local effekt = Effect(Enum.MeshType.Brick,Vector3.new(1,1,1)*(3+(math.random(-10000,10000)/10000*0.2)),0,Enum.Material.Neon,Color3.fromHSV(math.random(10,100)/1000,1,1),rarm.Position,root.Orientation,Vector3.new(0,0,0),Vector3.new(-0.2,-0.2,0.4+(power/20)),Vector3.new(),0,0)
+local effekt2 = Effect(Enum.MeshType.Brick,Vector3.new(1,1,1)*(3+(math.random(-10000,10000)/10000*0.2)),0,Enum.Material.Neon,Color3.fromHSV(math.random(10,100)/1000,1,1),larm.Position,root.Orientation,Vector3.new(0,0,0),Vector3.new(-0.2,-0.2,0.4+(power/20)),Vector3.new(),0,0)
+for i,v in pairs(findAllNearestTorso(root.Position,30)) do
+damage(v.Parent,180-(power*4))
+end
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0,1.5,-.1)     *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.new(0,0,0)         *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1.5,0.55,0) *CFrame.Angles(math.rad(-40),math.rad(0),math.rad(-40)), spd)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5,0.55,0)  *CFrame.Angles(math.rad(40),math.rad(0),math.rad(40)), spd)
+torso.Weld.C0 = CFrame.new(0, -0.5, 0)  *CFrame.Angles(math.rad(-90),math.rad(i*35),math.rad(0))
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,-0.95,0)*CFrame.Angles(math.rad(70),math.rad(0),math.rad(20)), spd)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,-0.95,0) *CFrame.Angles(math.rad(-70),math.rad(0),math.rad(-20)), spd)
+if i*35 > asdf then
+asdf = (i*35) + 180
+end
+end
+torso.Weld.C0 = CFrame.new(0, -0.5, 0)  *CFrame.Angles(math.rad(-90),math.rad(0),math.rad(0))
+end
+
+mouse.KeyDown:connect(function(key)
+if debounce == false then
+if string.byte(string.lower(key)) == 48 then
+noidle = true
+freeze = true
+debounce = true
+local keyup = false
+local power = 20
+local asd = mouse.KeyUp:connect(function(key) keyup = true end)
+local i = 0
+repeat rs:wait()
+if i > 10 then i = 0
+Effect(Enum.MeshType.Sphere,Vector3.new(10,10,10)*5,0.999,Enum.Material.Neon,Color3.fromHSV(0,1,1),torso.Position,Vector3.new(),Vector3.new(),Vector3.new(-0.3,-0.3,-0.3),Vector3.new(),-0.005,-0.05)
+sound(180204562,torso.Position,2,1+((i/40)*2))
+end
+local spd = 0.4
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0,1.5,.1)     *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.new(0,0,0)         *CFrame.Angles(math.rad(-40),math.rad(0),math.rad(0)), spd)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1,0.55,-0.3) *CFrame.Angles(math.rad(90),math.rad(0),math.rad(40)), spd)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5,0.55,0)  *CFrame.Angles(math.rad(-40),math.rad(0),math.rad(40)), spd)
+torso.Weld.C0 = Lerp(torso.Weld.C0, CFrame.new(0, -1.5, 0)  *CFrame.Angles(math.rad(-40),math.rad(0),math.rad(0)), spd)
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,0,-0.5)*CFrame.Angles(math.rad(40),math.rad(0),math.rad(0)), spd)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,-0.5,-0.5) *CFrame.Angles(math.rad(-10),math.rad(0),math.rad(0)), spd)
+i = i + 1
+if power < 40 then power = power + 0.25 else keyup = true end
+until keyup == true
+Effect(Enum.MeshType.Sphere,Vector3.new(1,1,1)*5,0,Enum.Material.Neon,Color3.fromHSV(0,1,1),torso.Position,Vector3.new(),Vector3.new(),Vector3.new(0.5,0.5,0.5),Vector3.new(),0.04,0.1)
+Effect(Enum.MeshType.Sphere,Vector3.new(1,1,1)*5,0,Enum.Material.Neon,Color3.fromHSV(0,1,1),torso.Position,Vector3.new(),Vector3.new(),Vector3.new(0.5,0.5,0.5),Vector3.new(),0.04,0.2)
+Effect(Enum.MeshType.Sphere,Vector3.new(10,10,10)*5,0.999,Enum.Material.Neon,Color3.fromHSV(0,1,1),torso.Position,Vector3.new(),Vector3.new(),Vector3.new(-0.3,-0.3,-0.3),Vector3.new(),-0.005,-0.05)
+asd:disconnect()
+spintf(power)
+noidle = false
+freeze = false
+idk = true
+local mousasdfg = nil
+mousasdfg = mouse.Button1Down:connect(function() 
+noidle = true
+freeze = true
+debounce = true
+mousasdfg:disconnect()
+root.Velocity = Vector3.new()
+attackthree(true)
+idk = false
+combo = 1
+noidle = false
+freeze = false
+end)
+delay(0.2,function() debounce = false mousasdfg:disconnect() idk = false end)
+end
+end
+end)
+
+mouse.KeyDown:connect(function(key)
+if debounce == false then
+if string.byte(string.lower(key)) == 50 and jumped == true then
+freeze = true
+debounce = true
+root.Velocity = Vector3.new(0,120,0)+(root.CFrame.lookVector*20)
+sound(1388740053,torso.Position,10,math.random(180,200)/100)
+Effect(559831844,Vector3.new(0.1,0.1,0.1),0,Enum.Material.Neon,Color3.fromHSV(0,0,1),root.Position,Vector3.new(90,0,0),Vector3.new(),Vector3.new(0.2,0.2,0.2),Vector3.new(),0.05,-0.005)
+noidle = true
+local i = 0
+local spd = 0.4
+repeat rs:wait()
+root.Velocity = Vector3.new(0,root.Velocity.Y,0)+(root.CFrame.lookVector*20)
+torso.Weld.C0 = CFrame.new(0, -1, 0)  *CFrame.Angles(math.rad(i*10),0,0)
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0,1.5,-.1)     *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.new(0,0,0)         *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1.5,0.55,0) *CFrame.Angles(math.rad(-20),math.rad(0),math.rad(-50)), spd)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5,0.55,0)  *CFrame.Angles(math.rad(-20),math.rad(0),math.rad(50)), spd)
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,-0.95,0)*CFrame.Angles(math.rad(50),math.rad(0),math.rad(0)), spd)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,-0.95,0) *CFrame.Angles(math.rad(-50),math.rad(0),math.rad(0)), spd)
+i = i + 1
+until root.Velocity.Y < 0
+noidle = false
+torso.Weld.C0 = CFrame.new(0, -1, 0)  *CFrame.Angles(0,0,0)
+local ray = Ray.new(root.Position,Vector3.new(0, -6, 0))
+local part, endPoint = workspace:FindPartOnRay(ray, char)
+repeat rs:wait()
+root.Velocity = Vector3.new(0,root.Velocity.Y-50,0)+(root.CFrame.lookVector*10)
+local ray = Ray.new(root.Position,Vector3.new(0, -6, 0))
+part, endPoint = workspace:FindPartOnRay(ray, char)
+until part
+shake(50)
+sound(262562442,torso.Position,10,math.random(70,100)/100)
+Effect(559831844,Vector3.new(0.1,0.1,0.1),0,Enum.Material.Neon,Color3.fromHSV(0,0,1),endPoint,Vector3.new(90,0,0),Vector3.new(0,0.5,0),Vector3.new(0.3,0.3,0.3),Vector3.new(),0.05,-0.005)
+for i,x in pairs(findAllNearestTorso(root.Position,20)) do
+damage(x.Parent,math.random(0,0))
+end
+for i=1,15 do
+local asd = Vector3.new(math.random(-10000,10000)/10000,math.random(-10000,10000)/10000,math.random(-10000,10000)/10000)
+Effect(Enum.MeshType.Brick,Vector3.new(1,1,1)*math.random(3,5),-3,part.Material,part.Color,endPoint+Vector3.new(math.random(-10,10)/2,math.random(-1,0)/2,math.random(-10,10)/2),asd*360,Vector3.new(),Vector3.new(),Vector3.new(),0.05,0)
+Effect(Enum.MeshType.Sphere,Vector3.new(1,1,1)*math.random(7,10),0,Enum.Material.Neon,part.Color,endPoint+Vector3.new(math.random(-8,8),-1,math.random(-8,8)),Vector3.new(),Vector3.new(),Vector3.new(1,1,1),Vector3.new(),0.03,-0.002)
+end
+freeze = false
+delay(0.1,function() debounce = false end)
+end
+end
+end)
+
+velocityYFall=0
+velocityYFall2=0
+velocityYFall3=0
+velocityYFall4=0
+neckrotY=0
+neckrotY2=0
+torsorotY=0
+torsorotY2=0
+torsoY=0
+torsoY2=0
+colored = 0
+sine = 0
+change=0.4
+movement=5
+timeranim=0
+running = true
+
+--[[mouse.KeyDown:connect(function(key)
+key = string.lower(key)
+if string.byte(key) == 48 then
+running = true
+local keyup = mouse.KeyUp:connect(function(key)
+if string.byte(key) == 48 then
+running = false
+end
+end)
+repeat rs:wait() until running == false
+keyup:disconnect()
+end
+end)]]
+
+icolor=1
+imode=false
+
+didjump = false
+jumppower = 0
+freeze = false
+debounceimpact = false
+
+mouse.KeyDown:connect(function(key)
+if key == " " and debounce == false and jumped == true and candouble == true then
+candouble = false
+sound(138210320,torso.Position,2,math.random(240,260)/100)
+Effect(559831844,Vector3.new(0.1,0.1,0.1),0,Enum.Material.Neon,Color3.fromHSV(0,0,1),root.Position,Vector3.new(90,0,0),Vector3.new(),Vector3.new(0.1,0.1,0.1),Vector3.new(),0.05,-0.005)
+root.Velocity = Vector3.new(root.Velocity.X,hum.JumpPower,root.Velocity.Z)
+noidle = true
+local spd = 0.15
+for i=1,20 do rs:wait()
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0,1.5,-.1)     *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.new(0,0,0)         *CFrame.Angles(math.rad(0),math.rad(0),math.rad(0)), spd)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-0.5,0.55,-0.2) *CFrame.Angles(math.rad(160),math.rad(0),math.rad(20)), spd)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(0.5,0.55,-0.2)  *CFrame.Angles(math.rad(160),math.rad(0),math.rad(-20)), spd)
+torso.Weld.C0 = CFrame.new(0, -1, 0)  *CFrame.Angles(-math.rad((i/20)*(360*2)),0,0)
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,0,-0.5)*CFrame.Angles(math.rad(-10),math.rad(0),math.rad(0)), spd)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,0,-0.5) *CFrame.Angles(math.rad(-10),math.rad(0),math.rad(0)), spd)
+end
+noidle = false
+end
+end)
+
+function jumpimpact()
+if debounceimpact == false then
+debounceimpact = true
+if jumppower < -150 then jumppower = -150 end
+shake(-jumppower/5)
+for i=1,-jumppower/20 do rs:wait()
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.Angles(0,0,0), 0.05)
+torso.Weld.C0 = Lerp(torso.Weld.C0, CFrame.new(0, (jumppower/20)*size-hum.HipHeight, 0) * CFrame.Angles(math.rad(0),math.rad(0), math.rad(0)), 0.05)
+end
+debounceimpact = false
+end
+end
+
+rs:connect(function()
+
+hum.JumpPower = 100
+
+if icolor > 1 then
+imode = false
+elseif icolor < 0 then
+imode = true
+end
+
+if imode == true then
+icolor = icolor + 0.01
+else
+icolor = icolor - 0.01
+end
+
+if p.Character.Parent == nil then
+local model = Instance.new("Model")
+model.Name = p.Name
+p.Character = model
+for i,v in pairs(char:GetChildren()) do
+v.Parent = p.Character
+end
+end
+
+char = p.Character
+if p.Character.Parent ~= workspace then
+p.Character.Parent = workspace
+end
+for i,v in pairs(char:GetChildren()) do
+if v:IsA("Accoutrement") then
+if v.Handle:FindFirstChild("Mesh") then
+v.Handle:FindFirstChild("Mesh").Offset = Vector3.new()
+v.Handle.Transparency = 0
+end
+elseif v:IsA("BasePart") then
+v.Anchored = false
+if v:FindFirstChildOfClass("BodyPosition") then
+v:FindFirstChildOfClass("BodyPosition"):Destroy()
+end
+if v:FindFirstChildOfClass("BodyVelocity") then
+v:FindFirstChildOfClass("BodyVelocity"):Destroy()
+end
+if v:FindFirstChildOfClass("BodyGyro") and v:FindFirstChildOfClass("BodyGyro").Name ~= "lolnochara" then
+v:FindFirstChildOfClass("BodyGyro"):Destroy()
+end
+if v:FindFirstChild("Mesh") then
+v:FindFirstChild("Mesh").Offset = Vector3.new()
+end
+if not DebrisModel:FindFirstChild(v.Name.."FORCEFIELD") then
+local force = Instance.new("Part",DebrisModel)
+force.Name = v.Name.."FORCEFIELD"
+if v ~= hed then
+force.Size = v.Size+(Vector3.new(1,1,1)*0.2)
+else
+force.Size = (Vector3.new(1,1,1)*v.Size.Y)+(Vector3.new(1,1,1)*0.2)
+end
+force.CanCollide = false
+force.Transparency = 1
+force.Color = Color3.new(0,1,1)
+force.Material = Enum.Material.Neon
+newWeld(v,force,0,0,0)
+else
+if not DebrisModel:FindFirstChild(v.Name.."FORCEFIELD"):FindFirstChildOfClass("Weld") then
+newWeld(v,DebrisModel:FindFirstChild(v.Name.."FORCEFIELD"),0,0,0)
+end
+end
+if v.Name ~= "HumanoidRootPart" then
+v.Transparency = 0
+else
+v.Transparency = 1
+end
+end
+end
+
+if freeze == false then
+hum.WalkSpeed = (666/10)*size
+change=1.4
+movement=18
+else
+hum.WalkSpeed = 1
+change=0.4
+movement=5
+end
+
+if -root.Velocity.Y/1.5 > -5 and -root.Velocity.Y/1.5 < 150 then
+velocityYFall = root.Velocity.Y/1.5
+else
+if -root.Velocity.Y/1.5 < -5 then
+velocityYFall = 5
+elseif -root.Velocity.Y/1.5 > 150 then
+velocityYFall = -150
+end
+end
+
+if -root.Velocity.Y/180 > 0 and -root.Velocity.Y/180 < 1.2 then
+velocityYFall2 = root.Velocity.Y/180
+else
+if -root.Velocity.Y/180 < 0 then
+velocityYFall2 = 0
+elseif -root.Velocity.Y/180 > 1.2 then
+velocityYFall2 = -1.2
+end
+end
+
+if -root.Velocity.Y/1.5 > -5 and -root.Velocity.Y/1.5 < 50 then
+velocityYFall3 = root.Velocity.Y/1.5
+else
+if -root.Velocity.Y/1.5 < -5 then
+velocityYFall3 = 5
+elseif -root.Velocity.Y/1.5 > 50 then
+velocityYFall3 = -50
+end
+end
+
+if -root.Velocity.Y/1.5 > -50 and -root.Velocity.Y/1.5 < 20 then
+velocityYFall4 = root.Velocity.Y/1.5
+else
+if -root.Velocity.Y/180 < -5 then
+velocityYFall4 = 5
+elseif -root.Velocity.Y/180 > 50 then
+velocityYFall4 = -50
+end
+end
+
+if root.RotVelocity.Y/6 < 1 and root.RotVelocity.Y/6 > -1 then
+neckrotY = root.RotVelocity.Y/6
+else
+if root.RotVelocity.Y/6 < -1 then
+neckrotY = -1
+elseif root.RotVelocity.Y/6 > 1 then
+neckrotY = 1
+end
+end
+
+if root.RotVelocity.Y/8 < 0.6 and root.RotVelocity.Y/8 > -0.6 then
+neckrotY2 = root.RotVelocity.Y/8
+else
+if root.RotVelocity.Y/8 < -0.6 then
+neckrotY2 = -0.6
+elseif root.RotVelocity.Y/8 > 0.6 then
+neckrotY2 = 0.6
+end
+end
+
+if root.RotVelocity.Y/6 < 0.2 and root.RotVelocity.Y/6 > -0.2 then
+torsorotY = root.RotVelocity.Y/6
+else
+if root.RotVelocity.Y/6 < -0.2 then
+torsorotY = -0.2
+elseif root.RotVelocity.Y/6 > 0.2 then
+torsorotY = 0.2
+end
+end
+
+if root.RotVelocity.Y/8 < 0.2 and root.RotVelocity.Y/8 > -0.2 then
+torsorotY2 = root.RotVelocity.Y/8
+else
+if root.RotVelocity.Y/8 < -0.2 then
+torsorotY2 = -0.2
+elseif root.RotVelocity.Y/8 > 0.2 then
+torsorotY2 = 0.2
+end
+end
+
+simulate(hed.CFrame*CFrame.new(0,0.4,0.8),0,hed,Vector3.new(),hair)
+
+torsoY = -(torso.Velocity*Vector3.new(1, 0, 1)).magnitude/20
+torsoY2 = -(torso.Velocity*Vector3.new(1, 0, 1)).magnitude/36
+
+local ray1 = Ray.new(root.Position+Vector3.new(size,0,0),Vector3.new(0, -4*size, 0))
+local part1, endPoint = workspace:FindPartOnRay(ray1, char)
+
+local ray2 = Ray.new(root.Position-Vector3.new(size,0,0),Vector3.new(0, -4*size, 0))
+local part2, endPoint = workspace:FindPartOnRay(ray2, char)
+
+local ray3 = Ray.new(root.Position+Vector3.new(0,0,size/2),Vector3.new(0, -4*size, 0))
+local part3, endPoint = workspace:FindPartOnRay(ray3, char)
+
+local ray4 = Ray.new(root.Position-Vector3.new(0,0,size/2),Vector3.new(0, -4*size, 0))
+local part4, endPoint = workspace:FindPartOnRay(ray4, char)
+
+local ray5 = Ray.new(root.Position+Vector3.new(size,0,size/2),Vector3.new(0, -4*size, 0))
+local part5, endPoint = workspace:FindPartOnRay(ray5, char)
+
+local ray6 = Ray.new(root.Position-Vector3.new(size,0,size/2),Vector3.new(0, -4*size, 0))
+local part6, endPoint = workspace:FindPartOnRay(ray6, char)
+
+local ray7 = Ray.new(root.Position+Vector3.new(size,0,-size/2),Vector3.new(0, -4*size, 0))
+local part7, endPoint = workspace:FindPartOnRay(ray7, char)
+
+local ray8 = Ray.new(root.Position-Vector3.new(size,0,-size/2),Vector3.new(0, -4*size, 0))
+local part8, endPoint = workspace:FindPartOnRay(ray8, char)
+
+local ray = Ray.new(root.Position,Vector3.new(0, -6, 0))
+local part, endPoint = workspace:FindPartOnRay(ray, char)
+
+if part1 or part2 or part3 or part4 or part5 or part6 or part7 or part8 then jumped = false candouble = true else endPoint = 0 jumped = true end
+
+local rlegray = Ray.new(rleg.Position+Vector3.new(0,size/2,0),Vector3.new(0, -1.75*size, 0))
+local rlegpart, rlegendPoint = workspace:FindPartOnRay(rlegray, char)
+
+local llegray = Ray.new(lleg.Position+Vector3.new(0,size/2,0),Vector3.new(0, -1.75*size, 0))
+local llegpart, llegendPoint = workspace:FindPartOnRay(llegray, char)
+
+if hum.Health > 0 and noidle == false then
+if (torso.Velocity*Vector3.new(1, 0, 1)).magnitude >= 5 and jumped == false then
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0, 1.5, -.2) * CFrame.Angles(math.rad((torso.Velocity*Vector3.new(1, 0, 1)).magnitude/35),torsorotY, math.rad(0)+torsorotY), 0.4)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.Angles((change/10)*math.cos(sine/2)+0.1,-(change/10)*math.cos(sine/4)-(torsorotY/5),(change/5)*math.cos(sine/4)), 0.1)
+--rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5,0.62-(movement/40)*math.cos(sine/4)/3,(movement/150)+(movement/40)*math.cos(sine/4))*CFrame.Angles(math.rad(-5-(movement*2)*math.cos(sine/4))+ -(movement/10)*math.sin(sine/4),math.rad(0-(movement*2)*math.cos(sine/4)),math.rad(0)), 0.2)
+--larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1.5,0.62+(movement/40)*math.cos(sine/4)/3,(movement/150)-(movement/40)*math.cos(sine/4))*CFrame.Angles(math.rad(-5+(movement*2)*math.cos(sine/4))+ (movement/10)*math.sin(sine/4),math.rad(0-(movement*2)*math.cos(sine/4)),math.rad(0)), 0.2)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5,0.8-(movement/40)*math.cos(sine/4)/3,(movement/150)+(movement/40)*math.cos(sine/4))*CFrame.Angles(math.rad(-70-(movement*0.5)*math.cos(sine/4))+ -(movement/40)*math.sin(sine/4),math.rad(-25-(movement*2)*math.cos(sine/4)),math.rad(10)), 0.2)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1.5,0.8+(movement/40)*math.cos(sine/4)/3,(movement/150)-(movement/40)*math.cos(sine/4))*CFrame.Angles(math.rad(-70+(movement*0.5)*math.cos(sine/4))+ (movement/40)*math.sin(sine/4),math.rad(25-(movement*2)*math.cos(sine/4)),math.rad(-10)), 0.2)
+torso.Weld.C0 = Lerp(torso.Weld.C0, CFrame.new(0, -1.05+(change/2)*math.cos(sine/2), 0) * CFrame.Angles(math.rad(-(change*20)-(movement/20)*math.cos(sine/2)), torsorotY2+math.rad(0-4*math.sin(sine/4)), torsorotY2+math.rad(0-1*math.cos(sine/4))), 0.1)
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,(-0.85-(movement/15)*math.cos(sine/4)/2),-0.1+(movement/15)*math.cos(sine/4))*CFrame.Angles(math.rad(-10+(change*5)-movement*math.cos(sine/4))+ -(movement/10)*math.sin(sine/4),math.rad(0+(movement*2)*math.cos(sine/4)),math.rad(0)), 0.2)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,(-0.85+(movement/15)*math.cos(sine/4)/2),-0.1-(movement/15)*math.cos(sine/4))*CFrame.Angles(math.rad(-10+(change*5)+movement*math.cos(sine/4))+ (movement/10)*math.sin(sine/4),math.rad(0+(movement*2)*math.cos(sine/4)),math.rad(0)), 0.2)
+elseif jumped == true then
+didjump = true
+jumppower = root.Velocity.Y
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0, 1.5, -.1) * CFrame.Angles(0,0,0), 0.4)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.Angles(math.rad(-velocityYFall3/5),0,0), 0.1)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1.5,0.55-velocityYFall3/70,0)*CFrame.Angles(math.rad(-velocityYFall3/10),math.rad(0),math.rad(velocityYFall)), 0.2)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5,0.55-velocityYFall3/70,0)*CFrame.Angles(math.rad(-velocityYFall3/10),math.rad(0),math.rad(-velocityYFall)), 0.2)
+torso.Weld.C0 = Lerp(torso.Weld.C0, CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(velocityYFall3/10),math.rad(0), math.rad(0)), 0.1)
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(-0.5,-0.925,0)*CFrame.Angles(math.rad(-35),math.rad(0),math.rad(-2)), 0.2)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0.5,0,-0.8)*CFrame.Angles(math.rad(-25),math.rad(0),math.rad(2)), 0.2)
+elseif (torso.Velocity*Vector3.new(1, 0, 1)).magnitude < 5*size then
+hed.Weld.C0 = Lerp(hed.Weld.C0, CFrame.new(0, 1.5*size, -.1*size) * CFrame.Angles(math.rad((torso.Velocity*Vector3.new(1, 0, 1)).magnitude/35),0, 0), 0.4)
+hed.Weld.C1 = Lerp(hed.Weld.C1, CFrame.Angles(math.rad(-10)+0.05*math.sin(sine/16)+0.15,math.rad(-40)+0.01*math.sin(sine/32),0.01*math.sin(sine/32)), 0.1)
+larm.Weld.C0 = Lerp(larm.Weld.C0, CFrame.new(-1.5*size,0.55*size-(0.1*size)*math.cos(sine/16)/3,-0.05-0.1*size*math.cos(sine/16))*CFrame.Angles(math.rad(20+4*math.cos(sine/16)),math.rad(-5-5*math.sin(sine/16)),math.rad(10+2*math.cos(sine/16))), 0.2)
+rarm.Weld.C0 = Lerp(rarm.Weld.C0, CFrame.new(1.5*size,0.55*size-(0.1*size)*math.cos(sine/16)/3,-0.05-0.1*size*math.cos(sine/16))*CFrame.Angles(math.rad(-20+4*math.cos(sine/16)),math.rad(5+5*math.sin(sine/16)),math.rad(5-2*math.cos(sine/16))), 0.2)
+torso.Weld.C0 = Lerp(torso.Weld.C0, CFrame.new(0, -1.1*size-(0.1*size)*math.cos(sine/16)-hum.HipHeight, -0.1*math.cos(sine/16)) * CFrame.Angles(math.rad(-10-2*math.cos(sine/16)),math.rad(-40), math.rad(1-1*math.cos(sine/16))), 0.1)
+lleg.Weld.C0 = Lerp(lleg.Weld.C0, CFrame.new(0,llegendPoint.Y-lleg.Position.Y,0)*CFrame.new(-0.5*size,0*size+(0.1*size)*math.cos(sine/16),0)*CFrame.Angles(math.rad(15),math.rad(20),math.rad(-10+1*math.cos(sine/16))), 0.1)
+rleg.Weld.C0 = Lerp(rleg.Weld.C0, CFrame.new(0,rlegendPoint.Y-rleg.Position.Y,0)*CFrame.new(0.5*size,0*size+(0.1*size)*math.cos(sine/16),0)*CFrame.Angles(math.rad(-5),math.rad(-20),math.rad(10+1*math.cos(sine/16))), 0.1)
+end
+end
+if didjump == true and jumped == false and jumppower < 0 then
+didjump = false
+jumpimpact()
+end
+
+--timeposition = soundz.TimePosition
+hed.BrickColor = skin_color
+torso.BrickColor = skin_color
+rarm.BrickColor = skin_color
+larm.BrickColor = skin_color
+rleg.BrickColor = skin_color
+lleg.BrickColor = skin_color
+sine = sine + change
+hum.Health = math.huge
+hum.MaxHealth = math.huge
+end)
